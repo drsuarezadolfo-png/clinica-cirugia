@@ -1,7 +1,6 @@
 import { useState, useEffect, useRef } from "react"
 import { supabase } from "./supabase.js"
 
-// ─── THEME ────────────────────────────────────────────────────────────────
 const G = {
   bg: "#F9F6F1", surface: "#FFFFFF", surfaceAlt: "#F3EFE8", border: "#E5DDD0",
   gold: "#B8975A", goldLight: "#D4B57A", goldDark: "#8A6E3A",
@@ -27,13 +26,11 @@ const injectStyles = () => {
   document.head.appendChild(s)
 }
 
-// ─── HELPERS ──────────────────────────────────────────────────────────────
 const uid = () => Math.random().toString(36).slice(2, 9)
 const today = () => new Date().toISOString().split("T")[0]
 const fmtDate = (d) => d ? new Date(d + "T12:00:00").toLocaleDateString("es-MX", { day: "2-digit", month: "short", year: "numeric" }) : "—"
 const inputSty = { width: "100%", padding: "10px 14px", border: `1px solid ${G.border}`, borderRadius: 6, fontSize: 13, outline: "none", background: G.bg, color: G.charcoal }
 
-// ─── COMPONENTS ───────────────────────────────────────────────────────────
 function GoldBtn({ children, onClick, small, outline, danger, disabled }) {
   return (
     <button onClick={onClick} disabled={disabled} style={{ padding: small ? "7px 16px" : "10px 22px", background: danger ? G.danger : outline ? "transparent" : `linear-gradient(135deg,${G.gold},${G.goldDark})`, color: outline ? G.gold : "#FFF", border: outline ? `1.5px solid ${G.gold}` : "none", borderRadius: 4, fontSize: small ? 12 : 13, fontWeight: 500, letterSpacing: "0.06em", textTransform: "uppercase", cursor: disabled ? "not-allowed" : "pointer", opacity: disabled ? 0.6 : 1 }}>
@@ -83,7 +80,7 @@ function ModalHeader({ title, onClose }) {
 }
 
 // ─── AUTH ─────────────────────────────────────────────────────────────────
-function LoginScreen({ onLogin }) {
+function LoginScreen() {
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [loading, setLoading] = useState(false)
@@ -155,7 +152,7 @@ function PageHeader({ title, subtitle, action }) {
 }
 
 // ─── AGENDA ───────────────────────────────────────────────────────────────
-function AgendaSection({ userId, setModal }) {
+function AgendaSection({ setModal }) {
   const [appts, setAppts] = useState([])
   const [loading, setLoading] = useState(true)
 
@@ -170,6 +167,12 @@ function AgendaSection({ userId, setModal }) {
   const updateStatus = async (id, status) => {
     await supabase.from("appointments").update({ status }).eq("id", id)
     setAppts(v => v.map(a => a.id === id ? { ...a, status } : a))
+  }
+
+  const deleteAppt = async (id) => {
+    if (!confirm("¿Eliminar esta cita?")) return
+    await supabase.from("appointments").delete().eq("id", id)
+    setAppts(v => v.filter(a => a.id !== id))
   }
 
   const statusColor = { confirmada: G.success, pendiente: G.gold, cancelada: G.danger }
@@ -198,6 +201,7 @@ function AgendaSection({ userId, setModal }) {
                   <option value="confirmada">Confirmada</option>
                   <option value="cancelada">Cancelada</option>
                 </select>
+                <button onClick={() => deleteAppt(a.id)} style={{ background: "transparent", border: "none", color: G.danger, cursor: "pointer", fontSize: 16 }}>🗑</button>
               </div>
             ))}
           </div>
@@ -208,7 +212,7 @@ function AgendaSection({ userId, setModal }) {
 }
 
 // ─── PATIENTS ─────────────────────────────────────────────────────────────
-function PatientsSection({ userId, setModal, onOpen }) {
+function PatientsSection({ setModal, onOpen }) {
   const [patients, setPatients] = useState([])
   const [q, setQ] = useState("")
   const [loading, setLoading] = useState(true)
@@ -220,6 +224,13 @@ function PatientsSection({ userId, setModal, onOpen }) {
     setLoading(false)
   }
   useEffect(() => { load() }, [])
+
+  const deletePatient = async (e, id) => {
+    e.stopPropagation()
+    if (!confirm("¿Eliminar este paciente y todos sus datos?")) return
+    await supabase.from("patients").delete().eq("id", id)
+    setPatients(v => v.filter(p => p.id !== id))
+  }
 
   const filtered = patients.filter(p => p.name.toLowerCase().includes(q.toLowerCase()) || (p.phone || "").includes(q))
 
@@ -233,21 +244,24 @@ function PatientsSection({ userId, setModal, onOpen }) {
         {loading ? <div style={{ display: "flex", justifyContent: "center", padding: 60 }}><Spinner /></div> : filtered.length === 0 ? <EmptyState icon="👤" msg="Sin pacientes" /> : (
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(280px,1fr))", gap: 14 }}>
             {filtered.map(p => (
-              <div key={p.id} onClick={() => onOpen(p)} style={{ background: G.surface, border: `1px solid ${G.border}`, borderRadius: 8, padding: 20, cursor: "pointer", transition: "all 0.2s" }}
+              <div key={p.id} onClick={() => onOpen(p)} style={{ background: G.surface, border: `1px solid ${G.border}`, borderRadius: 8, padding: 20, cursor: "pointer", transition: "all 0.2s", position: "relative" }}
                 onMouseEnter={e => { e.currentTarget.style.borderColor = G.gold; e.currentTarget.style.boxShadow = `0 4px 20px rgba(184,151,90,0.12)` }}
                 onMouseLeave={e => { e.currentTarget.style.borderColor = G.border; e.currentTarget.style.boxShadow = "none" }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
                   <div style={{ width: 44, height: 44, borderRadius: "50%", background: `linear-gradient(135deg,${G.gold},${G.goldLight})`, display: "flex", alignItems: "center", justifyContent: "center", color: "#FFF", fontSize: 18, flexShrink: 0 }}>{p.name[0]}</div>
-                  <div>
+                  <div style={{ flex: 1 }}>
                     <div style={{ fontSize: 15, fontWeight: 500 }}>{p.name}</div>
                     <div style={{ fontSize: 12, color: G.muted, marginTop: 2 }}>{p.phone}</div>
+                  </div>
+                  <div style={{ display: "flex", gap: 6 }}>
+                    <button onClick={e => { e.stopPropagation(); setModal({ type: "editPatient", patient: p, onSave: load }) }} style={{ background: "transparent", border: "none", color: G.gold, cursor: "pointer", fontSize: 15 }}>✏️</button>
+                    <button onClick={e => deletePatient(e, p.id)} style={{ background: "transparent", border: "none", color: G.danger, cursor: "pointer", fontSize: 15 }}>🗑</button>
                   </div>
                 </div>
                 <div style={{ marginTop: 12, display: "flex", gap: 8, flexWrap: "wrap" }}>
                   {p.blood_type && <Tag label={p.blood_type} color={G.info} />}
                   {p.allergies && p.allergies !== "Ninguna conocida" && <Tag label="⚠ Alergias" color={G.danger} />}
                 </div>
-                <div style={{ marginTop: 8, fontSize: 11, color: G.muted }}>Desde {fmtDate(p.created_at?.split("T")[0])}</div>
               </div>
             ))}
           </div>
@@ -257,8 +271,68 @@ function PatientsSection({ userId, setModal, onOpen }) {
   )
 }
 
+// ─── DOWNLOAD HELPERS ─────────────────────────────────────────────────────
+const downloadPhoto = (photo) => {
+  const link = document.createElement("a")
+  link.href = photo.url
+  link.download = `${photo.label || "foto"}-${photo.date || "sin-fecha"}.jpg`
+  link.target = "_blank"
+  link.click()
+}
+
+const downloadHistoryPDF = (patient, history) => {
+  const content = `
+    <html>
+    <head>
+      <meta charset="UTF-8">
+      <style>
+        body { font-family: Georgia, serif; max-width: 800px; margin: 40px auto; color: #2C2826; }
+        h1 { font-size: 28px; color: #B8975A; border-bottom: 2px solid #B8975A; padding-bottom: 10px; }
+        h2 { font-size: 18px; color: #2C2826; margin-top: 30px; }
+        .meta { color: #8A7F74; font-size: 13px; margin-bottom: 8px; }
+        .card { background: #F9F6F1; border: 1px solid #E5DDD0; border-radius: 8px; padding: 20px; margin: 16px 0; }
+        .notes { background: #fff; border-left: 3px solid #B8975A; padding: 12px 16px; margin-top: 12px; line-height: 1.7; }
+        .header-info { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 20px 0; }
+        .field { background: #F3EFE8; padding: 10px 14px; border-radius: 6px; }
+        .field-label { font-size: 11px; color: #8A7F74; text-transform: uppercase; letter-spacing: 0.08em; }
+        .field-value { font-size: 14px; margin-top: 4px; }
+      </style>
+    </head>
+    <body>
+      <h1>Historial Clínico</h1>
+      <div class="header-info">
+        <div class="field"><div class="field-label">Paciente</div><div class="field-value">${patient.name}</div></div>
+        <div class="field"><div class="field-label">Fecha de nacimiento</div><div class="field-value">${patient.dob || "—"}</div></div>
+        <div class="field"><div class="field-label">Teléfono</div><div class="field-value">${patient.phone || "—"}</div></div>
+        <div class="field"><div class="field-label">Tipo sanguíneo</div><div class="field-value">${patient.blood_type || "—"}</div></div>
+        <div class="field"><div class="field-label">Alergias</div><div class="field-value">${patient.allergies || "—"}</div></div>
+      </div>
+      <h2>Procedimientos (${history.length})</h2>
+      ${history.map(h => `
+        <div class="card">
+          <strong style="font-size:16px">${h.procedure}</strong>
+          <div class="meta">${h.date || "—"} · ${h.surgeon || "—"} · Anestesia: ${h.anesthesia || "—"} · Duración: ${h.duration || "—"}</div>
+          ${h.notes ? `<div class="notes">${h.notes}</div>` : ""}
+          ${h.follow_up ? `<div class="meta" style="margin-top:10px">📅 Seguimiento: ${h.follow_up}</div>` : ""}
+        </div>
+      `).join("")}
+      <div style="margin-top:40px;color:#8A7F74;font-size:12px;border-top:1px solid #E5DDD0;padding-top:16px">
+        Generado el ${new Date().toLocaleDateString("es-MX", { day:"2-digit", month:"long", year:"numeric" })} · Clínica de Cirugía Plástica
+      </div>
+    </body>
+    </html>
+  `
+  const blob = new Blob([content], { type: "text/html;charset=utf-8" })
+  const url = URL.createObjectURL(blob)
+  const link = document.createElement("a")
+  link.href = url
+  link.download = `historial-${patient.name.replace(/\s+/g, "-")}.html`
+  link.click()
+  URL.revokeObjectURL(url)
+}
+
 // ─── PATIENT DETAIL ────────────────────────────────────────────────────────
-function PatientDetail({ patient, userId, setModal, onBack }) {
+function PatientDetail({ patient, setModal, onBack, onPatientUpdated }) {
   const [tab, setTab] = useState("info")
   const [history, setHistory] = useState([])
   const [photos, setPhotos] = useState([])
@@ -289,15 +363,22 @@ function PatientDetail({ patient, userId, setModal, onBack }) {
     setAppts(data || []); setLoadingA(false)
   }
 
+  const deleteHistory = async (id) => {
+    if (!confirm("¿Eliminar este procedimiento?")) return
+    await supabase.from("clinical_history").delete().eq("id", id)
+    setHistory(v => v.filter(h => h.id !== id))
+  }
+
   return (
     <div className="fade-in" style={{ flex: 1, display: "flex", flexDirection: "column" }}>
       <div style={{ padding: "20px 36px", borderBottom: `1px solid ${G.border}`, display: "flex", alignItems: "center", gap: 18 }}>
         <button onClick={onBack} style={{ background: "transparent", border: `1px solid ${G.border}`, borderRadius: 4, padding: "7px 14px", fontSize: 12, color: G.muted, cursor: "pointer" }}>← Pacientes</button>
         <div style={{ width: 50, height: 50, borderRadius: "50%", background: `linear-gradient(135deg,${G.gold},${G.goldLight})`, display: "flex", alignItems: "center", justifyContent: "center", color: "#FFF", fontSize: 22 }}>{patient.name[0]}</div>
-        <div>
+        <div style={{ flex: 1 }}>
           <div className="serif" style={{ fontSize: 24 }}>{patient.name}</div>
           <div style={{ fontSize: 13, color: G.muted }}>{patient.email} · {patient.phone}</div>
         </div>
+        <GoldBtn small outline onClick={() => setModal({ type: "editPatient", patient, onSave: onPatientUpdated })}>✏️ Editar</GoldBtn>
       </div>
       <div style={{ display: "flex", borderBottom: `1px solid ${G.border}`, padding: "0 36px" }}>
         {[["info", "Información"], ["history", "Historial"], ["photos", "Fotografías"], ["appts", "Citas"]].map(([id, label]) => (
@@ -306,8 +387,8 @@ function PatientDetail({ patient, userId, setModal, onBack }) {
       </div>
       <div style={{ padding: "24px 36px", flex: 1, overflow: "auto" }}>
         {tab === "info" && <PatientInfo patient={patient} />}
-        {tab === "history" && (loadingH ? <div style={{ display: "flex", justifyContent: "center", padding: 60 }}><Spinner /></div> : <HistoryTab patient={patient} history={history} setModal={setModal} onSave={loadHistory} userId={userId} />)}
-        {tab === "photos" && (loadingP ? <div style={{ display: "flex", justifyContent: "center", padding: 60 }}><Spinner /></div> : <PhotosTab patient={patient} photos={photos} setModal={setModal} onSave={loadPhotos} userId={userId} />)}
+        {tab === "history" && (loadingH ? <div style={{ display: "flex", justifyContent: "center", padding: 60 }}><Spinner /></div> : <HistoryTab patient={patient} history={history} setModal={setModal} onSave={loadHistory} onDelete={deleteHistory} />)}
+        {tab === "photos" && (loadingP ? <div style={{ display: "flex", justifyContent: "center", padding: 60 }}><Spinner /></div> : <PhotosTab patient={patient} photos={photos} setModal={setModal} onSave={loadPhotos} setPhotos={setPhotos} />)}
         {tab === "appts" && (loadingA ? <div style={{ display: "flex", justifyContent: "center", padding: 60 }}><Spinner /></div> : <ApptsTab appts={appts} />)}
       </div>
     </div>
@@ -331,12 +412,15 @@ function PatientInfo({ patient }) {
   )
 }
 
-function HistoryTab({ patient, history, setModal, onSave, userId }) {
+function HistoryTab({ patient, history, setModal, onSave, onDelete }) {
   return (
     <div>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
         <div className="serif" style={{ fontSize: 22 }}>Historial de Procedimientos</div>
-        <GoldBtn small onClick={() => setModal({ type: "addHistory", patientId: patient.id, userId, onSave })}>+ Agregar</GoldBtn>
+        <div style={{ display: "flex", gap: 10 }}>
+          {history.length > 0 && <GoldBtn small outline onClick={() => downloadHistoryPDF(patient, history)}>📥 Descargar PDF</GoldBtn>}
+          <GoldBtn small onClick={() => setModal({ type: "addHistory", patientId: patient.id, onSave })}>+ Agregar</GoldBtn>
+        </div>
       </div>
       {history.length === 0 ? <EmptyState icon="📋" msg="Sin procedimientos registrados" /> : history.map(h => (
         <div key={h.id} style={{ background: G.surface, border: `1px solid ${G.border}`, borderRadius: 8, padding: "20px 24px", marginBottom: 14 }}>
@@ -345,7 +429,7 @@ function HistoryTab({ patient, history, setModal, onSave, userId }) {
               <div className="serif" style={{ fontSize: 18 }}>{h.procedure}</div>
               <div style={{ fontSize: 12, color: G.muted, marginTop: 4 }}>{fmtDate(h.date)} · {h.surgeon} · Anestesia: {h.anesthesia} · Duración: {h.duration}</div>
             </div>
-            <Tag label={fmtDate(h.date)} color={G.gold} />
+            <button onClick={() => onDelete(h.id)} style={{ background: "transparent", border: "none", color: G.danger, cursor: "pointer", fontSize: 16 }}>🗑</button>
           </div>
           {h.notes && <div style={{ marginTop: 14, padding: "12px 16px", background: G.surfaceAlt, borderRadius: 6, fontSize: 13, lineHeight: 1.7 }}>{h.notes}</div>}
           {h.follow_up && <div style={{ marginTop: 8, fontSize: 12, color: G.info }}>📅 Seguimiento: {fmtDate(h.follow_up)}</div>}
@@ -355,17 +439,21 @@ function HistoryTab({ patient, history, setModal, onSave, userId }) {
   )
 }
 
-function PhotosTab({ patient, photos, setModal, onSave, userId }) {
+function PhotosTab({ patient, photos, setModal, onSave, setPhotos }) {
   const [filter, setFilter] = useState("all")
   const filtered = filter === "all" ? photos : photos.filter(p => p.type === filter)
 
-  const openPhoto = (ph) => setModal({ type: "viewPhoto", photo: ph })
+  const deletePhoto = async (id) => {
+    if (!confirm("¿Eliminar esta foto?")) return
+    await supabase.from("photos").delete().eq("id", id)
+    setPhotos(v => v.filter(p => p.id !== id))
+  }
 
   return (
     <div>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
         <div className="serif" style={{ fontSize: 22 }}>Galería Fotográfica</div>
-        <GoldBtn small onClick={() => setModal({ type: "addPhoto", patientId: patient.id, userId, onSave })}>+ Agregar Foto</GoldBtn>
+        <GoldBtn small onClick={() => setModal({ type: "addPhoto", patientId: patient.id, onSave })}>+ Agregar Foto</GoldBtn>
       </div>
       <div style={{ display: "flex", gap: 8, marginBottom: 20, flexWrap: "wrap" }}>
         {[["all", "Todas"], ["antes", "Antes"], ["despues", "Después"], ["intraop", "Intraop"], ["seguimiento", "Seguimiento"]].map(([v, l]) => (
@@ -373,15 +461,18 @@ function PhotosTab({ patient, photos, setModal, onSave, userId }) {
         ))}
       </div>
       {filtered.length === 0 ? <EmptyState icon="📷" msg="Sin fotografías" /> : (
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(180px,1fr))", gap: 12 }}>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(200px,1fr))", gap: 12 }}>
           {filtered.map(ph => (
-            <div key={ph.id} onClick={() => openPhoto(ph)} style={{ borderRadius: 8, overflow: "hidden", border: `1px solid ${G.border}`, cursor: "pointer" }}
-              onMouseEnter={e => e.currentTarget.style.boxShadow = "0 4px 20px rgba(0,0,0,0.15)"}
-              onMouseLeave={e => e.currentTarget.style.boxShadow = "none"}>
-              <img src={ph.url} alt={ph.label} style={{ width: "100%", height: 160, objectFit: "cover", display: "block" }} />
+            <div key={ph.id} style={{ borderRadius: 8, overflow: "hidden", border: `1px solid ${G.border}`, position: "relative" }}>
+              <img src={ph.url} alt={ph.label} style={{ width: "100%", height: 160, objectFit: "cover", display: "block", cursor: "pointer" }}
+                onClick={() => setModal({ type: "viewPhoto", photo: ph })} />
               <div style={{ padding: "10px 12px", background: G.surface }}>
                 <div style={{ fontSize: 11, fontWeight: 500 }}>{ph.label || "Foto"}</div>
                 <div style={{ fontSize: 11, color: G.muted, marginTop: 2 }}>{fmtDate(ph.date)}</div>
+                <div style={{ display: "flex", gap: 6, marginTop: 8 }}>
+                  <button onClick={() => downloadPhoto(ph)} style={{ flex: 1, padding: "5px", background: `${G.gold}18`, border: `1px solid ${G.gold}40`, borderRadius: 4, color: G.gold, fontSize: 11, cursor: "pointer" }}>📥 Descargar</button>
+                  <button onClick={() => deletePhoto(ph.id)} style={{ padding: "5px 8px", background: `${G.danger}18`, border: `1px solid ${G.danger}40`, borderRadius: 4, color: G.danger, fontSize: 11, cursor: "pointer" }}>🗑</button>
+                </div>
               </div>
             </div>
           ))}
@@ -410,7 +501,7 @@ function ApptsTab({ appts }) {
 }
 
 // ─── AI NOTES ─────────────────────────────────────────────────────────────
-function AINotesSection({ userId }) {
+function AINotesSection() {
   const [patients, setPatients] = useState([])
   const [patientId, setPatientId] = useState("")
   const [procedure, setProcedure] = useState("")
@@ -447,6 +538,18 @@ function AINotesSection({ userId }) {
     setLoading(false)
   }
 
+  const downloadNote = () => {
+    const patient = patients.find(p => p.id === patientId)
+    const content = `<html><head><meta charset="UTF-8"><style>body{font-family:Georgia,serif;max-width:700px;margin:40px auto;color:#2C2826;line-height:1.8}h1{color:#B8975A;border-bottom:2px solid #B8975A;padding-bottom:10px}pre{white-space:pre-wrap;font-family:Georgia,serif}</style></head><body><h1>Nota Clínica — ${noteType}</h1><p><strong>Paciente:</strong> ${patient?.name || "—"}</p><p><strong>Procedimiento:</strong> ${procedure || "—"}</p><pre>${result}</pre><p style="color:#8A7F74;font-size:12px;margin-top:40px;border-top:1px solid #E5DDD0;padding-top:16px">Generado el ${new Date().toLocaleDateString("es-MX")}</p></body></html>`
+    const blob = new Blob([content], { type: "text/html;charset=utf-8" })
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement("a")
+    link.href = url
+    link.download = `nota-${noteType}-${patient?.name?.replace(/\s+/g, "-") || "paciente"}.html`
+    link.click()
+    URL.revokeObjectURL(url)
+  }
+
   return (
     <div className="fade-in" style={{ flex: 1 }}>
       <PageHeader title="Notas Clínicas con IA" subtitle="Genera notas médicas profesionales automáticamente" />
@@ -480,6 +583,7 @@ function AINotesSection({ userId }) {
               <pre style={{ whiteSpace: "pre-wrap", fontFamily: "'Jost',sans-serif", fontSize: 13, lineHeight: 1.8 }}>{result}</pre>
               <div style={{ marginTop: 20, display: "flex", gap: 10 }}>
                 <GoldBtn small outline onClick={() => navigator.clipboard.writeText(result)}>📋 Copiar</GoldBtn>
+                <GoldBtn small outline onClick={downloadNote}>📥 Descargar</GoldBtn>
                 <GoldBtn small outline onClick={() => setResult("")}>Limpiar</GoldBtn>
               </div>
             </div>
@@ -491,21 +595,29 @@ function AINotesSection({ userId }) {
 }
 
 // ─── FORMS ────────────────────────────────────────────────────────────────
-function AddPatientForm({ userId, onSave, onClose }) {
-  const [f, setF] = useState({ name: "", dob: "", phone: "", email: "", blood_type: "", allergies: "", notes: "" })
+function PatientForm({ patient, onSave, onClose }) {
+  const [f, setF] = useState(patient ? {
+    name: patient.name || "", dob: patient.dob || "", phone: patient.phone || "",
+    email: patient.email || "", blood_type: patient.blood_type || "",
+    allergies: patient.allergies || "", notes: patient.notes || ""
+  } : { name: "", dob: "", phone: "", email: "", blood_type: "", allergies: "", notes: "" })
   const [saving, setSaving] = useState(false)
   const set = (k, v) => setF(p => ({ ...p, [k]: v }))
 
   const save = async () => {
     if (!f.name.trim()) return
     setSaving(true)
-    await supabase.from("patients").insert({ ...f })
+    if (patient) {
+      await supabase.from("patients").update(f).eq("id", patient.id)
+    } else {
+      await supabase.from("patients").insert(f)
+    }
     onSave(); onClose()
   }
 
   return (
     <div>
-      <ModalHeader title="Nuevo Paciente" onClose={onClose} />
+      <ModalHeader title={patient ? "Editar Paciente" : "Nuevo Paciente"} onClose={onClose} />
       <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
         <FormField label="Nombre completo"><input value={f.name} onChange={e => set("name", e.target.value)} style={inputSty} placeholder="Nombre completo" /></FormField>
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
@@ -530,7 +642,7 @@ function AddPatientForm({ userId, onSave, onClose }) {
   )
 }
 
-function AddApptForm({ userId, onSave, onClose }) {
+function AddApptForm({ onSave, onClose }) {
   const [patients, setPatients] = useState([])
   const [f, setF] = useState({ patient_id: "", patient_name: "", date: today(), time: "10:00", procedure: "", status: "pendiente", notes: "" })
   const [saving, setSaving] = useState(false)
@@ -578,7 +690,7 @@ function AddApptForm({ userId, onSave, onClose }) {
   )
 }
 
-function AddHistoryForm({ patientId, userId, onSave, onClose }) {
+function AddHistoryForm({ patientId, onSave, onClose }) {
   const [f, setF] = useState({ date: today(), procedure: "", surgeon: "", anesthesia: "General", duration: "", notes: "", follow_up: "" })
   const [saving, setSaving] = useState(false)
   const set = (k, v) => setF(p => ({ ...p, [k]: v }))
@@ -618,7 +730,7 @@ function AddHistoryForm({ patientId, userId, onSave, onClose }) {
   )
 }
 
-function AddPhotoForm({ patientId, userId, onSave, onClose }) {
+function AddPhotoForm({ patientId, onSave, onClose }) {
   const [f, setF] = useState({ label: "", type: "antes", date: today(), notes: "" })
   const [preview, setPreview] = useState("")
   const [saving, setSaving] = useState(false)
@@ -637,7 +749,6 @@ function AddPhotoForm({ patientId, userId, onSave, onClose }) {
     if (!preview) return
     setSaving(true)
     try {
-      // Upload to Supabase Storage
       const fileName = `${patientId}/${Date.now()}-${f.type}.jpg`
       const base64Data = preview.split(",")[1]
       const byteCharacters = atob(base64Data)
@@ -645,19 +756,15 @@ function AddPhotoForm({ patientId, userId, onSave, onClose }) {
       for (let i = 0; i < byteCharacters.length; i++) byteNumbers[i] = byteCharacters.charCodeAt(i)
       const byteArray = new Uint8Array(byteNumbers)
       const blob = new Blob([byteArray], { type: "image/jpeg" })
-
-      const { data: uploadData, error: uploadError } = await supabase.storage.from("patient-photos").upload(fileName, blob)
-
-      let url = preview // fallback to base64 if upload fails
+      const { error: uploadError } = await supabase.storage.from("patient-photos").upload(fileName, blob)
+      let url = preview
       if (!uploadError) {
         const { data: urlData } = supabase.storage.from("patient-photos").getPublicUrl(fileName)
         url = urlData?.publicUrl || preview
       }
-
       await supabase.from("photos").insert({ ...f, patient_id: patientId, storage_path: fileName, url })
       onSave(); onClose()
     } catch (e) {
-      // Save with base64 as fallback
       await supabase.from("photos").insert({ ...f, patient_id: patientId, url: preview })
       onSave(); onClose()
     }
@@ -700,6 +807,9 @@ function PhotoViewer({ photo, onClose }) {
         <span style={{ fontSize: 13, color: G.muted }}>{fmtDate(photo.date)}</span>
       </div>
       {photo.notes && <div style={{ marginTop: 12, fontSize: 13, color: G.muted }}>{photo.notes}</div>}
+      <div style={{ marginTop: 16 }}>
+        <GoldBtn small onClick={() => downloadPhoto(photo)}>📥 Descargar Foto</GoldBtn>
+      </div>
     </div>
   )
 }
@@ -721,30 +831,34 @@ export default function App() {
   }, [])
 
   const logout = () => supabase.auth.signOut()
+  const changeSection = (s) => { setSection(s); setSelectedPatient(null) }
 
   if (loading) return <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", background: G.charcoal }}><Spinner size={48} /></div>
   if (!session) return <LoginScreen />
-
-  const userId = session.user.id
-
-  const changeSection = (s) => { setSection(s); setSelectedPatient(null) }
 
   return (
     <div style={{ display: "flex", height: "100vh", overflow: "hidden" }}>
       <Sidebar section={section} setSection={changeSection} open={sidebarOpen} toggle={() => setSidebarOpen(v => !v)} onLogout={logout} />
       <main style={{ flex: 1, overflow: "auto", display: "flex", flexDirection: "column" }}>
-        {section === "agenda" && <AgendaSection userId={userId} setModal={setModal} />}
-        {section === "patients" && <PatientsSection userId={userId} setModal={setModal} onOpen={(p) => { setSelectedPatient(p); setSection("patientDetail") }} />}
-        {section === "patientDetail" && selectedPatient && <PatientDetail patient={selectedPatient} userId={userId} setModal={setModal} onBack={() => setSection("patients")} />}
-        {section === "aiNotes" && <AINotesSection userId={userId} />}
+        {section === "agenda" && <AgendaSection setModal={setModal} />}
+        {section === "patients" && <PatientsSection setModal={setModal} onOpen={(p) => { setSelectedPatient(p); setSection("patientDetail") }} />}
+        {section === "patientDetail" && selectedPatient && (
+          <PatientDetail
+            patient={selectedPatient}
+            setModal={setModal}
+            onBack={() => setSection("patients")}
+            onPatientUpdated={() => {}}
+          />
+        )}
+        {section === "aiNotes" && <AINotesSection />}
       </main>
 
       {modal && (
         <ModalOverlay onClose={() => setModal(null)}>
-          {modal.type === "addPatient" && <AddPatientForm userId={userId} onSave={modal.onSave} onClose={() => setModal(null)} />}
-          {modal.type === "addAppt" && <AddApptForm userId={userId} onSave={modal.onSave} onClose={() => setModal(null)} />}
-          {modal.type === "addHistory" && <AddHistoryForm patientId={modal.patientId} userId={userId} onSave={modal.onSave} onClose={() => setModal(null)} />}
-          {modal.type === "addPhoto" && <AddPhotoForm patientId={modal.patientId} userId={userId} onSave={modal.onSave} onClose={() => setModal(null)} />}
+          {(modal.type === "addPatient" || modal.type === "editPatient") && <PatientForm patient={modal.patient} onSave={modal.onSave} onClose={() => setModal(null)} />}
+          {modal.type === "addAppt" && <AddApptForm onSave={modal.onSave} onClose={() => setModal(null)} />}
+          {modal.type === "addHistory" && <AddHistoryForm patientId={modal.patientId} onSave={modal.onSave} onClose={() => setModal(null)} />}
+          {modal.type === "addPhoto" && <AddPhotoForm patientId={modal.patientId} onSave={modal.onSave} onClose={() => setModal(null)} />}
           {modal.type === "viewPhoto" && <PhotoViewer photo={modal.photo} onClose={() => setModal(null)} />}
         </ModalOverlay>
       )}
