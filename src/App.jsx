@@ -26,10 +26,35 @@ const injectStyles = () => {
   document.head.appendChild(s)
 }
 
-const uid = () => Math.random().toString(36).slice(2, 9)
 const today = () => new Date().toISOString().split("T")[0]
 const fmtDate = (d) => d ? new Date(d + "T12:00:00").toLocaleDateString("es-MX", { day: "2-digit", month: "short", year: "numeric" }) : "—"
 const inputSty = { width: "100%", padding: "10px 14px", border: `1px solid ${G.border}`, borderRadius: 6, fontSize: 13, outline: "none", background: G.bg, color: G.charcoal }
+
+const printPDF = (title, htmlContent) => {
+  const w = window.open("", "_blank")
+  w.document.write(`
+    <html><head><meta charset="UTF-8"><title>${title}</title>
+    <style>
+      body{font-family:Georgia,serif;max-width:800px;margin:40px auto;color:#2C2826;line-height:1.7}
+      h1{font-size:26px;color:#B8975A;border-bottom:2px solid #B8975A;padding-bottom:10px;margin-bottom:20px}
+      h2{font-size:16px;color:#2C2826;margin:0 0 6px}
+      .card{background:#F9F6F1;border:1px solid #E5DDD0;border-radius:8px;padding:18px 22px;margin:14px 0;page-break-inside:avoid}
+      .meta{color:#8A7F74;font-size:12px;margin-bottom:8px}
+      .notes{background:#fff;border-left:3px solid #B8975A;padding:12px 16px;margin-top:10px;font-size:13px}
+      .grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:16px 0}
+      .field{background:#F3EFE8;padding:10px 14px;border-radius:6px}
+      .field-label{font-size:10px;color:#8A7F74;text-transform:uppercase;letter-spacing:0.08em}
+      .field-value{font-size:13px;margin-top:3px}
+      .footer{margin-top:40px;color:#8A7F74;font-size:11px;border-top:1px solid #E5DDD0;padding-top:14px}
+      @media print{body{margin:20px}}
+    </style></head><body>
+    ${htmlContent}
+    <div class="footer">Generado el ${new Date().toLocaleDateString("es-MX", { day:"2-digit", month:"long", year:"numeric" })} · Clínica de Cirugía Plástica</div>
+    <script>window.onload=()=>{window.print()}<\/script>
+    </body></html>
+  `)
+  w.document.close()
+}
 
 function GoldBtn({ children, onClick, small, outline, danger, disabled }) {
   return (
@@ -79,7 +104,6 @@ function ModalHeader({ title, onClose }) {
   )
 }
 
-// ─── AUTH ─────────────────────────────────────────────────────────────────
 function LoginScreen() {
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
@@ -113,7 +137,6 @@ function LoginScreen() {
   )
 }
 
-// ─── SIDEBAR ──────────────────────────────────────────────────────────────
 function Sidebar({ section, setSection, open, toggle, onLogout }) {
   const items = [["agenda", "📅", "Agenda"], ["patients", "👤", "Pacientes"], ["aiNotes", "✦", "Notas con IA"]]
   return (
@@ -151,7 +174,16 @@ function PageHeader({ title, subtitle, action }) {
   )
 }
 
-// ─── AGENDA ───────────────────────────────────────────────────────────────
+function SubTabs({ tabs, active, onChange }) {
+  return (
+    <div style={{ display: "flex", gap: 6, marginBottom: 20 }}>
+      {tabs.map(([id, label]) => (
+        <button key={id} onClick={() => onChange(id)} style={{ padding: "8px 18px", borderRadius: 20, border: `1px solid ${active === id ? G.gold : G.border}`, background: active === id ? `${G.gold}18` : "transparent", color: active === id ? G.gold : G.muted, fontSize: 13, fontWeight: active === id ? 500 : 400, cursor: "pointer" }}>{label}</button>
+      ))}
+    </div>
+  )
+}
+
 function AgendaSection({ setModal }) {
   const [appts, setAppts] = useState([])
   const [loading, setLoading] = useState(true)
@@ -211,7 +243,6 @@ function AgendaSection({ setModal }) {
   )
 }
 
-// ─── PATIENTS ─────────────────────────────────────────────────────────────
 function PatientsSection({ setModal, onOpen }) {
   const [patients, setPatients] = useState([])
   const [q, setQ] = useState("")
@@ -244,7 +275,7 @@ function PatientsSection({ setModal, onOpen }) {
         {loading ? <div style={{ display: "flex", justifyContent: "center", padding: 60 }}><Spinner /></div> : filtered.length === 0 ? <EmptyState icon="👤" msg="Sin pacientes" /> : (
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(280px,1fr))", gap: 14 }}>
             {filtered.map(p => (
-              <div key={p.id} onClick={() => onOpen(p)} style={{ background: G.surface, border: `1px solid ${G.border}`, borderRadius: 8, padding: 20, cursor: "pointer", transition: "all 0.2s", position: "relative" }}
+              <div key={p.id} onClick={() => onOpen(p)} style={{ background: G.surface, border: `1px solid ${G.border}`, borderRadius: 8, padding: 20, cursor: "pointer", transition: "all 0.2s" }}
                 onMouseEnter={e => { e.currentTarget.style.borderColor = G.gold; e.currentTarget.style.boxShadow = `0 4px 20px rgba(184,151,90,0.12)` }}
                 onMouseLeave={e => { e.currentTarget.style.borderColor = G.border; e.currentTarget.style.boxShadow = "none" }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
@@ -271,7 +302,6 @@ function PatientsSection({ setModal, onOpen }) {
   )
 }
 
-// ─── DOWNLOAD HELPERS ─────────────────────────────────────────────────────
 const downloadPhoto = (photo) => {
   const link = document.createElement("a")
   link.href = photo.url
@@ -280,69 +310,19 @@ const downloadPhoto = (photo) => {
   link.click()
 }
 
-const downloadHistoryPDF = (patient, history) => {
-  const content = `
-    <html>
-    <head>
-      <meta charset="UTF-8">
-      <style>
-        body { font-family: Georgia, serif; max-width: 800px; margin: 40px auto; color: #2C2826; }
-        h1 { font-size: 28px; color: #B8975A; border-bottom: 2px solid #B8975A; padding-bottom: 10px; }
-        h2 { font-size: 18px; color: #2C2826; margin-top: 30px; }
-        .meta { color: #8A7F74; font-size: 13px; margin-bottom: 8px; }
-        .card { background: #F9F6F1; border: 1px solid #E5DDD0; border-radius: 8px; padding: 20px; margin: 16px 0; }
-        .notes { background: #fff; border-left: 3px solid #B8975A; padding: 12px 16px; margin-top: 12px; line-height: 1.7; }
-        .header-info { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 20px 0; }
-        .field { background: #F3EFE8; padding: 10px 14px; border-radius: 6px; }
-        .field-label { font-size: 11px; color: #8A7F74; text-transform: uppercase; letter-spacing: 0.08em; }
-        .field-value { font-size: 14px; margin-top: 4px; }
-      </style>
-    </head>
-    <body>
-      <h1>Historial Clínico</h1>
-      <div class="header-info">
-        <div class="field"><div class="field-label">Paciente</div><div class="field-value">${patient.name}</div></div>
-        <div class="field"><div class="field-label">Fecha de nacimiento</div><div class="field-value">${patient.dob || "—"}</div></div>
-        <div class="field"><div class="field-label">Teléfono</div><div class="field-value">${patient.phone || "—"}</div></div>
-        <div class="field"><div class="field-label">Tipo sanguíneo</div><div class="field-value">${patient.blood_type || "—"}</div></div>
-        <div class="field"><div class="field-label">Alergias</div><div class="field-value">${patient.allergies || "—"}</div></div>
-      </div>
-      <h2>Procedimientos (${history.length})</h2>
-      ${history.map(h => `
-        <div class="card">
-          <strong style="font-size:16px">${h.procedure}</strong>
-          <div class="meta">${h.date || "—"} · ${h.surgeon || "—"} · Anestesia: ${h.anesthesia || "—"} · Duración: ${h.duration || "—"}</div>
-          ${h.notes ? `<div class="notes">${h.notes}</div>` : ""}
-          ${h.follow_up ? `<div class="meta" style="margin-top:10px">📅 Seguimiento: ${h.follow_up}</div>` : ""}
-        </div>
-      `).join("")}
-      <div style="margin-top:40px;color:#8A7F74;font-size:12px;border-top:1px solid #E5DDD0;padding-top:16px">
-        Generado el ${new Date().toLocaleDateString("es-MX", { day:"2-digit", month:"long", year:"numeric" })} · Clínica de Cirugía Plástica
-      </div>
-    </body>
-    </html>
-  `
-  const blob = new Blob([content], { type: "text/html;charset=utf-8" })
-  const url = URL.createObjectURL(blob)
-  const link = document.createElement("a")
-  link.href = url
-  link.download = `historial-${patient.name.replace(/\s+/g, "-")}.html`
-  link.click()
-  URL.revokeObjectURL(url)
-}
-
-// ─── PATIENT DETAIL ────────────────────────────────────────────────────────
-function PatientDetail({ patient, setModal, onBack, onPatientUpdated }) {
+function PatientDetail({ patient, setModal, onBack }) {
   const [tab, setTab] = useState("info")
   const [history, setHistory] = useState([])
+  const [evolutions, setEvolutions] = useState([])
   const [photos, setPhotos] = useState([])
   const [appts, setAppts] = useState([])
+  const [historySubTab, setHistorySubTab] = useState("procedimientos")
   const [loadingH, setLoadingH] = useState(false)
   const [loadingP, setLoadingP] = useState(false)
   const [loadingA, setLoadingA] = useState(false)
 
   useEffect(() => {
-    if (tab === "history") loadHistory()
+    if (tab === "history") { loadHistory(); loadEvolutions() }
     if (tab === "photos") loadPhotos()
     if (tab === "appts") loadAppts()
   }, [tab])
@@ -351,6 +331,10 @@ function PatientDetail({ patient, setModal, onBack, onPatientUpdated }) {
     setLoadingH(true)
     const { data } = await supabase.from("clinical_history").select("*").eq("patient_id", patient.id).order("date", { ascending: false })
     setHistory(data || []); setLoadingH(false)
+  }
+  const loadEvolutions = async () => {
+    const { data } = await supabase.from("evolutions").select("*").eq("patient_id", patient.id).order("date", { ascending: false })
+    setEvolutions(data || [])
   }
   const loadPhotos = async () => {
     setLoadingP(true)
@@ -368,6 +352,43 @@ function PatientDetail({ patient, setModal, onBack, onPatientUpdated }) {
     await supabase.from("clinical_history").delete().eq("id", id)
     setHistory(v => v.filter(h => h.id !== id))
   }
+  const deleteEvolution = async (id) => {
+    if (!confirm("¿Eliminar esta evolución?")) return
+    await supabase.from("evolutions").delete().eq("id", id)
+    setEvolutions(v => v.filter(e => e.id !== id))
+  }
+
+  const downloadHistoryPDF = () => {
+    printPDF(`Historial - ${patient.name}`, `
+      <h1>Historial Clínico — ${patient.name}</h1>
+      <div class="grid">
+        <div class="field"><div class="field-label">Fecha de nacimiento</div><div class="field-value">${patient.dob || "—"}</div></div>
+        <div class="field"><div class="field-label">Tipo sanguíneo</div><div class="field-value">${patient.blood_type || "—"}</div></div>
+        <div class="field"><div class="field-label">Teléfono</div><div class="field-value">${patient.phone || "—"}</div></div>
+        <div class="field"><div class="field-label">Alergias</div><div class="field-value">${patient.allergies || "—"}</div></div>
+      </div>
+      <h2 style="margin-top:24px;font-size:18px;color:#B8975A">Procedimientos (${history.length})</h2>
+      ${history.map(h => `
+        <div class="card">
+          <h2>${h.procedure}</h2>
+          <div class="meta">${h.date || "—"} · ${h.surgeon || "—"} · Anestesia: ${h.anesthesia || "—"} · Duración: ${h.duration || "—"}</div>
+          ${h.notes ? `<div class="notes">${h.notes}</div>` : ""}
+          ${h.follow_up ? `<div class="meta" style="margin-top:8px">📅 Seguimiento: ${h.follow_up}</div>` : ""}
+        </div>`).join("")}
+    `)
+  }
+
+  const downloadEvolutionsPDF = () => {
+    printPDF(`Evoluciones - ${patient.name}`, `
+      <h1>Evoluciones — ${patient.name}</h1>
+      <p class="meta" style="margin-bottom:20px">${patient.phone || ""} · ${patient.email || ""}</p>
+      ${evolutions.map(e => `
+        <div class="card">
+          <div class="meta">${e.date || "—"} · Dr/a: ${e.doctor || "—"}</div>
+          <div class="notes">${e.notes || ""}</div>
+        </div>`).join("")}
+    `)
+  }
 
   return (
     <div className="fade-in" style={{ flex: 1, display: "flex", flexDirection: "column" }}>
@@ -378,7 +399,7 @@ function PatientDetail({ patient, setModal, onBack, onPatientUpdated }) {
           <div className="serif" style={{ fontSize: 24 }}>{patient.name}</div>
           <div style={{ fontSize: 13, color: G.muted }}>{patient.email} · {patient.phone}</div>
         </div>
-        <GoldBtn small outline onClick={() => setModal({ type: "editPatient", patient, onSave: onPatientUpdated })}>✏️ Editar</GoldBtn>
+        <GoldBtn small outline onClick={() => setModal({ type: "editPatient", patient, onSave: () => {} })}>✏️ Editar</GoldBtn>
       </div>
       <div style={{ display: "flex", borderBottom: `1px solid ${G.border}`, padding: "0 36px" }}>
         {[["info", "Información"], ["history", "Historial"], ["photos", "Fotografías"], ["appts", "Citas"]].map(([id, label]) => (
@@ -387,7 +408,53 @@ function PatientDetail({ patient, setModal, onBack, onPatientUpdated }) {
       </div>
       <div style={{ padding: "24px 36px", flex: 1, overflow: "auto" }}>
         {tab === "info" && <PatientInfo patient={patient} />}
-        {tab === "history" && (loadingH ? <div style={{ display: "flex", justifyContent: "center", padding: 60 }}><Spinner /></div> : <HistoryTab patient={patient} history={history} setModal={setModal} onSave={loadHistory} onDelete={deleteHistory} />)}
+        {tab === "history" && (
+          loadingH ? <div style={{ display: "flex", justifyContent: "center", padding: 60 }}><Spinner /></div> :
+          <div>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
+              <div className="serif" style={{ fontSize: 22 }}>Historial Clínico</div>
+            </div>
+            <SubTabs tabs={[["procedimientos", "Procedimientos"], ["evoluciones", "Evoluciones"]]} active={historySubTab} onChange={setHistorySubTab} />
+            {historySubTab === "procedimientos" && (
+              <div>
+                <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, marginBottom: 16 }}>
+                  {history.length > 0 && <GoldBtn small outline onClick={downloadHistoryPDF}>📥 PDF</GoldBtn>}
+                  <GoldBtn small onClick={() => setModal({ type: "addHistory", patientId: patient.id, onSave: loadHistory })}>+ Agregar</GoldBtn>
+                </div>
+                {history.length === 0 ? <EmptyState icon="🔬" msg="Sin procedimientos registrados" /> : history.map(h => (
+                  <div key={h.id} style={{ background: G.surface, border: `1px solid ${G.border}`, borderRadius: 8, padding: "20px 24px", marginBottom: 14 }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+                      <div>
+                        <div className="serif" style={{ fontSize: 18 }}>{h.procedure}</div>
+                        <div style={{ fontSize: 12, color: G.muted, marginTop: 4 }}>{fmtDate(h.date)} · {h.surgeon} · Anestesia: {h.anesthesia} · Duración: {h.duration}</div>
+                      </div>
+                      <button onClick={() => deleteHistory(h.id)} style={{ background: "transparent", border: "none", color: G.danger, cursor: "pointer", fontSize: 16 }}>🗑</button>
+                    </div>
+                    {h.notes && <div style={{ marginTop: 14, padding: "12px 16px", background: G.surfaceAlt, borderRadius: 6, fontSize: 13, lineHeight: 1.7 }}>{h.notes}</div>}
+                    {h.follow_up && <div style={{ marginTop: 8, fontSize: 12, color: G.info }}>📅 Seguimiento: {fmtDate(h.follow_up)}</div>}
+                  </div>
+                ))}
+              </div>
+            )}
+            {historySubTab === "evoluciones" && (
+              <div>
+                <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, marginBottom: 16 }}>
+                  {evolutions.length > 0 && <GoldBtn small outline onClick={downloadEvolutionsPDF}>📥 PDF</GoldBtn>}
+                  <GoldBtn small onClick={() => setModal({ type: "addEvolution", patientId: patient.id, onSave: loadEvolutions })}>+ Agregar</GoldBtn>
+                </div>
+                {evolutions.length === 0 ? <EmptyState icon="📝" msg="Sin evoluciones registradas" /> : evolutions.map(e => (
+                  <div key={e.id} style={{ background: G.surface, border: `1px solid ${G.border}`, borderRadius: 8, padding: "20px 24px", marginBottom: 14 }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+                      <div style={{ fontSize: 12, color: G.muted }}>{fmtDate(e.date)} · Dr/a: {e.doctor || "—"}</div>
+                      <button onClick={() => deleteEvolution(e.id)} style={{ background: "transparent", border: "none", color: G.danger, cursor: "pointer", fontSize: 16 }}>🗑</button>
+                    </div>
+                    <div style={{ marginTop: 12, padding: "12px 16px", background: G.surfaceAlt, borderRadius: 6, fontSize: 13, lineHeight: 1.8 }}>{e.notes}</div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
         {tab === "photos" && (loadingP ? <div style={{ display: "flex", justifyContent: "center", padding: 60 }}><Spinner /></div> : <PhotosTab patient={patient} photos={photos} setModal={setModal} onSave={loadPhotos} setPhotos={setPhotos} />)}
         {tab === "appts" && (loadingA ? <div style={{ display: "flex", justifyContent: "center", padding: 60 }}><Spinner /></div> : <ApptsTab appts={appts} />)}
       </div>
@@ -408,33 +475,6 @@ function PatientInfo({ patient }) {
           </div>
         ))}
       </div>
-    </div>
-  )
-}
-
-function HistoryTab({ patient, history, setModal, onSave, onDelete }) {
-  return (
-    <div>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
-        <div className="serif" style={{ fontSize: 22 }}>Historial de Procedimientos</div>
-        <div style={{ display: "flex", gap: 10 }}>
-          {history.length > 0 && <GoldBtn small outline onClick={() => downloadHistoryPDF(patient, history)}>📥 Descargar PDF</GoldBtn>}
-          <GoldBtn small onClick={() => setModal({ type: "addHistory", patientId: patient.id, onSave })}>+ Agregar</GoldBtn>
-        </div>
-      </div>
-      {history.length === 0 ? <EmptyState icon="📋" msg="Sin procedimientos registrados" /> : history.map(h => (
-        <div key={h.id} style={{ background: G.surface, border: `1px solid ${G.border}`, borderRadius: 8, padding: "20px 24px", marginBottom: 14 }}>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
-            <div>
-              <div className="serif" style={{ fontSize: 18 }}>{h.procedure}</div>
-              <div style={{ fontSize: 12, color: G.muted, marginTop: 4 }}>{fmtDate(h.date)} · {h.surgeon} · Anestesia: {h.anesthesia} · Duración: {h.duration}</div>
-            </div>
-            <button onClick={() => onDelete(h.id)} style={{ background: "transparent", border: "none", color: G.danger, cursor: "pointer", fontSize: 16 }}>🗑</button>
-          </div>
-          {h.notes && <div style={{ marginTop: 14, padding: "12px 16px", background: G.surfaceAlt, borderRadius: 6, fontSize: 13, lineHeight: 1.7 }}>{h.notes}</div>}
-          {h.follow_up && <div style={{ marginTop: 8, fontSize: 12, color: G.info }}>📅 Seguimiento: {fmtDate(h.follow_up)}</div>}
-        </div>
-      ))}
     </div>
   )
 }
@@ -463,7 +503,7 @@ function PhotosTab({ patient, photos, setModal, onSave, setPhotos }) {
       {filtered.length === 0 ? <EmptyState icon="📷" msg="Sin fotografías" /> : (
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(200px,1fr))", gap: 12 }}>
           {filtered.map(ph => (
-            <div key={ph.id} style={{ borderRadius: 8, overflow: "hidden", border: `1px solid ${G.border}`, position: "relative" }}>
+            <div key={ph.id} style={{ borderRadius: 8, overflow: "hidden", border: `1px solid ${G.border}` }}>
               <img src={ph.url} alt={ph.label} style={{ width: "100%", height: 160, objectFit: "cover", display: "block", cursor: "pointer" }}
                 onClick={() => setModal({ type: "viewPhoto", photo: ph })} />
               <div style={{ padding: "10px 12px", background: G.surface }}>
@@ -500,7 +540,6 @@ function ApptsTab({ appts }) {
   )
 }
 
-// ─── AI NOTES ─────────────────────────────────────────────────────────────
 function AINotesSection() {
   const [patients, setPatients] = useState([])
   const [patientId, setPatientId] = useState("")
@@ -524,30 +563,27 @@ function AINotesSection() {
 
     try {
       const resp = await fetch("https://api.anthropic.com/v1/messages", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
+        method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ model: "claude-sonnet-4-20250514", max_tokens: 1000, messages: [{ role: "user", content: prompt }] })
       })
       const data = await resp.json()
       const text = data.content?.map(c => c.text || "").join("") || ""
       if (!text) throw new Error("Sin respuesta")
       setResult(text)
-    } catch (e) {
-      setError("Error generando la nota. Verifica la conexión.")
-    }
+    } catch (e) { setError("Error generando la nota. Verifica la conexión.") }
     setLoading(false)
   }
 
   const downloadNote = () => {
     const patient = patients.find(p => p.id === patientId)
-    const content = `<html><head><meta charset="UTF-8"><style>body{font-family:Georgia,serif;max-width:700px;margin:40px auto;color:#2C2826;line-height:1.8}h1{color:#B8975A;border-bottom:2px solid #B8975A;padding-bottom:10px}pre{white-space:pre-wrap;font-family:Georgia,serif}</style></head><body><h1>Nota Clínica — ${noteType}</h1><p><strong>Paciente:</strong> ${patient?.name || "—"}</p><p><strong>Procedimiento:</strong> ${procedure || "—"}</p><pre>${result}</pre><p style="color:#8A7F74;font-size:12px;margin-top:40px;border-top:1px solid #E5DDD0;padding-top:16px">Generado el ${new Date().toLocaleDateString("es-MX")}</p></body></html>`
-    const blob = new Blob([content], { type: "text/html;charset=utf-8" })
-    const url = URL.createObjectURL(blob)
-    const link = document.createElement("a")
-    link.href = url
-    link.download = `nota-${noteType}-${patient?.name?.replace(/\s+/g, "-") || "paciente"}.html`
-    link.click()
-    URL.revokeObjectURL(url)
+    printPDF(`Nota ${noteType} - ${patient?.name || "Paciente"}`, `
+      <h1>Nota Clínica — ${noteType.charAt(0).toUpperCase() + noteType.slice(1)}</h1>
+      <div class="grid">
+        <div class="field"><div class="field-label">Paciente</div><div class="field-value">${patient?.name || "—"}</div></div>
+        <div class="field"><div class="field-label">Procedimiento</div><div class="field-value">${procedure || "—"}</div></div>
+      </div>
+      <div class="notes" style="margin-top:20px;white-space:pre-wrap">${result}</div>
+    `)
   }
 
   return (
@@ -556,21 +592,10 @@ function AINotesSection() {
       <div style={{ padding: "24px 36px", display: "grid", gridTemplateColumns: "1fr 1fr", gap: 24, height: "calc(100% - 100px)" }}>
         <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
           <div className="serif" style={{ fontSize: 20 }}>Datos de la Consulta</div>
-          <FormField label="Paciente">
-            <select value={patientId} onChange={e => setPatientId(e.target.value)} style={inputSty}>
-              <option value="">— Seleccionar —</option>
-              {patients.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
-            </select>
-          </FormField>
-          <FormField label="Procedimiento"><input value={procedure} onChange={e => setProcedure(e.target.value)} placeholder="Ej: Rinoplastia, Abdominoplastia…" style={inputSty} /></FormField>
-          <FormField label="Tipo de Nota">
-            <select value={noteType} onChange={e => setNoteType(e.target.value)} style={inputSty}>
-              {["preoperatoria", "postoperatoria", "seguimiento", "interconsulta", "urgencia"].map(t => <option key={t} value={t}>{t.charAt(0).toUpperCase() + t.slice(1)}</option>)}
-            </select>
-          </FormField>
-          <FormField label="Hallazgos y Observaciones">
-            <textarea value={findings} onChange={e => setFindings(e.target.value)} rows={6} placeholder="Describe los hallazgos clínicos, estado del paciente…" style={{ ...inputSty, resize: "vertical" }} />
-          </FormField>
+          <FormField label="Paciente"><select value={patientId} onChange={e => setPatientId(e.target.value)} style={inputSty}><option value="">— Seleccionar —</option>{patients.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}</select></FormField>
+          <FormField label="Procedimiento"><input value={procedure} onChange={e => setProcedure(e.target.value)} placeholder="Ej: Rinoplastia…" style={inputSty} /></FormField>
+          <FormField label="Tipo de Nota"><select value={noteType} onChange={e => setNoteType(e.target.value)} style={inputSty}>{["preoperatoria", "postoperatoria", "seguimiento", "interconsulta", "urgencia"].map(t => <option key={t} value={t}>{t.charAt(0).toUpperCase() + t.slice(1)}</option>)}</select></FormField>
+          <FormField label="Hallazgos y Observaciones"><textarea value={findings} onChange={e => setFindings(e.target.value)} rows={6} placeholder="Describe los hallazgos clínicos…" style={{ ...inputSty, resize: "vertical" }} /></FormField>
           <GoldBtn onClick={generate} disabled={loading}>{loading ? "Generando…" : "✦ Generar Nota Médica"}</GoldBtn>
           {error && <div style={{ color: G.danger, fontSize: 13 }}>{error}</div>}
         </div>
@@ -583,7 +608,7 @@ function AINotesSection() {
               <pre style={{ whiteSpace: "pre-wrap", fontFamily: "'Jost',sans-serif", fontSize: 13, lineHeight: 1.8 }}>{result}</pre>
               <div style={{ marginTop: 20, display: "flex", gap: 10 }}>
                 <GoldBtn small outline onClick={() => navigator.clipboard.writeText(result)}>📋 Copiar</GoldBtn>
-                <GoldBtn small outline onClick={downloadNote}>📥 Descargar</GoldBtn>
+                <GoldBtn small outline onClick={downloadNote}>📥 PDF</GoldBtn>
                 <GoldBtn small outline onClick={() => setResult("")}>Limpiar</GoldBtn>
               </div>
             </div>
@@ -594,24 +619,16 @@ function AINotesSection() {
   )
 }
 
-// ─── FORMS ────────────────────────────────────────────────────────────────
 function PatientForm({ patient, onSave, onClose }) {
-  const [f, setF] = useState(patient ? {
-    name: patient.name || "", dob: patient.dob || "", phone: patient.phone || "",
-    email: patient.email || "", blood_type: patient.blood_type || "",
-    allergies: patient.allergies || "", notes: patient.notes || ""
-  } : { name: "", dob: "", phone: "", email: "", blood_type: "", allergies: "", notes: "" })
+  const [f, setF] = useState(patient ? { name: patient.name || "", dob: patient.dob || "", phone: patient.phone || "", email: patient.email || "", blood_type: patient.blood_type || "", allergies: patient.allergies || "", notes: patient.notes || "" } : { name: "", dob: "", phone: "", email: "", blood_type: "", allergies: "", notes: "" })
   const [saving, setSaving] = useState(false)
   const set = (k, v) => setF(p => ({ ...p, [k]: v }))
 
   const save = async () => {
     if (!f.name.trim()) return
     setSaving(true)
-    if (patient) {
-      await supabase.from("patients").update(f).eq("id", patient.id)
-    } else {
-      await supabase.from("patients").insert(f)
-    }
+    if (patient) { await supabase.from("patients").update(f).eq("id", patient.id) }
+    else { await supabase.from("patients").insert(f) }
     onSave(); onClose()
   }
 
@@ -619,19 +636,14 @@ function PatientForm({ patient, onSave, onClose }) {
     <div>
       <ModalHeader title={patient ? "Editar Paciente" : "Nuevo Paciente"} onClose={onClose} />
       <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-        <FormField label="Nombre completo"><input value={f.name} onChange={e => set("name", e.target.value)} style={inputSty} placeholder="Nombre completo" /></FormField>
+        <FormField label="Nombre completo"><input value={f.name} onChange={e => set("name", e.target.value)} style={inputSty} /></FormField>
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
           <FormField label="Fecha de nacimiento"><input type="date" value={f.dob} onChange={e => set("dob", e.target.value)} style={inputSty} /></FormField>
-          <FormField label="Tipo sanguíneo">
-            <select value={f.blood_type} onChange={e => set("blood_type", e.target.value)} style={inputSty}>
-              <option value="">—</option>
-              {["A+", "A-", "B+", "B-", "O+", "O-", "AB+", "AB-"].map(t => <option key={t}>{t}</option>)}
-            </select>
-          </FormField>
+          <FormField label="Tipo sanguíneo"><select value={f.blood_type} onChange={e => set("blood_type", e.target.value)} style={inputSty}><option value="">—</option>{["A+","A-","B+","B-","O+","O-","AB+","AB-"].map(t => <option key={t}>{t}</option>)}</select></FormField>
         </div>
-        <FormField label="Teléfono"><input value={f.phone} onChange={e => set("phone", e.target.value)} style={inputSty} placeholder="55 0000 0000" /></FormField>
-        <FormField label="Correo"><input value={f.email} onChange={e => set("email", e.target.value)} style={inputSty} placeholder="correo@email.com" /></FormField>
-        <FormField label="Alergias"><input value={f.allergies} onChange={e => set("allergies", e.target.value)} style={inputSty} placeholder="Ninguna conocida" /></FormField>
+        <FormField label="Teléfono"><input value={f.phone} onChange={e => set("phone", e.target.value)} style={inputSty} /></FormField>
+        <FormField label="Correo"><input value={f.email} onChange={e => set("email", e.target.value)} style={inputSty} /></FormField>
+        <FormField label="Alergias"><input value={f.allergies} onChange={e => set("allergies", e.target.value)} style={inputSty} /></FormField>
         <FormField label="Notas"><textarea value={f.notes} onChange={e => set("notes", e.target.value)} rows={3} style={{ ...inputSty, resize: "vertical" }} /></FormField>
         <div style={{ display: "flex", gap: 10 }}>
           <GoldBtn onClick={save} disabled={saving}>{saving ? "Guardando…" : "Guardar"}</GoldBtn>
@@ -644,13 +656,11 @@ function PatientForm({ patient, onSave, onClose }) {
 
 function AddApptForm({ onSave, onClose }) {
   const [patients, setPatients] = useState([])
-  const [f, setF] = useState({ patient_id: "", patient_name: "", date: today(), time: "10:00", procedure: "", status: "pendiente", notes: "" })
+  const [f, setF] = useState({ patient_id: "", date: today(), time: "10:00", procedure: "", status: "pendiente", notes: "" })
   const [saving, setSaving] = useState(false)
   const set = (k, v) => setF(p => ({ ...p, [k]: v }))
 
-  useEffect(() => {
-    supabase.from("patients").select("id,name").order("name").then(({ data }) => setPatients(data || []))
-  }, [])
+  useEffect(() => { supabase.from("patients").select("id,name").order("name").then(({ data }) => setPatients(data || [])) }, [])
 
   const save = async () => {
     if (!f.patient_id || !f.procedure.trim()) return
@@ -664,22 +674,13 @@ function AddApptForm({ onSave, onClose }) {
     <div>
       <ModalHeader title="Nueva Cita" onClose={onClose} />
       <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-        <FormField label="Paciente">
-          <select value={f.patient_id} onChange={e => set("patient_id", e.target.value)} style={inputSty}>
-            <option value="">— Seleccionar —</option>
-            {patients.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
-          </select>
-        </FormField>
+        <FormField label="Paciente"><select value={f.patient_id} onChange={e => set("patient_id", e.target.value)} style={inputSty}><option value="">— Seleccionar —</option>{patients.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}</select></FormField>
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
           <FormField label="Fecha"><input type="date" value={f.date} onChange={e => set("date", e.target.value)} style={inputSty} /></FormField>
           <FormField label="Hora"><input type="time" value={f.time} onChange={e => set("time", e.target.value)} style={inputSty} /></FormField>
         </div>
-        <FormField label="Procedimiento"><input value={f.procedure} onChange={e => set("procedure", e.target.value)} style={inputSty} placeholder="Ej: Consulta inicial…" /></FormField>
-        <FormField label="Estado">
-          <select value={f.status} onChange={e => set("status", e.target.value)} style={inputSty}>
-            <option value="pendiente">Pendiente</option><option value="confirmada">Confirmada</option><option value="cancelada">Cancelada</option>
-          </select>
-        </FormField>
+        <FormField label="Procedimiento"><input value={f.procedure} onChange={e => set("procedure", e.target.value)} style={inputSty} /></FormField>
+        <FormField label="Estado"><select value={f.status} onChange={e => set("status", e.target.value)} style={inputSty}><option value="pendiente">Pendiente</option><option value="confirmada">Confirmada</option><option value="cancelada">Cancelada</option></select></FormField>
         <FormField label="Notas"><input value={f.notes} onChange={e => set("notes", e.target.value)} style={inputSty} /></FormField>
         <div style={{ display: "flex", gap: 10 }}>
           <GoldBtn onClick={save} disabled={saving}>{saving ? "Guardando…" : "Guardar"}</GoldBtn>
@@ -712,15 +713,43 @@ function AddHistoryForm({ patientId, onSave, onClose }) {
           <FormField label="Cirujano"><input value={f.surgeon} onChange={e => set("surgeon", e.target.value)} style={inputSty} placeholder="Dr. Nombre" /></FormField>
         </div>
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
-          <FormField label="Anestesia">
-            <select value={f.anesthesia} onChange={e => set("anesthesia", e.target.value)} style={inputSty}>
-              {["General", "Local", "Sedación", "Epidural"].map(a => <option key={a}>{a}</option>)}
-            </select>
-          </FormField>
+          <FormField label="Anestesia"><select value={f.anesthesia} onChange={e => set("anesthesia", e.target.value)} style={inputSty}>{["General","Local","Sedación","Epidural"].map(a => <option key={a}>{a}</option>)}</select></FormField>
           <FormField label="Duración"><input value={f.duration} onChange={e => set("duration", e.target.value)} style={inputSty} placeholder="2h 30min" /></FormField>
         </div>
         <FormField label="Notas clínicas"><textarea value={f.notes} onChange={e => set("notes", e.target.value)} rows={4} style={{ ...inputSty, resize: "vertical" }} /></FormField>
         <FormField label="Fecha de seguimiento"><input type="date" value={f.follow_up} onChange={e => set("follow_up", e.target.value)} style={inputSty} /></FormField>
+        <div style={{ display: "flex", gap: 10 }}>
+          <GoldBtn onClick={save} disabled={saving}>{saving ? "Guardando…" : "Guardar"}</GoldBtn>
+          <GoldBtn outline onClick={onClose}>Cancelar</GoldBtn>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function AddEvolutionForm({ patientId, onSave, onClose }) {
+  const [f, setF] = useState({ date: today(), doctor: "", notes: "" })
+  const [saving, setSaving] = useState(false)
+  const set = (k, v) => setF(p => ({ ...p, [k]: v }))
+
+  const save = async () => {
+    if (!f.notes.trim()) return
+    setSaving(true)
+    await supabase.from("evolutions").insert({ ...f, patient_id: patientId })
+    onSave(); onClose()
+  }
+
+  return (
+    <div>
+      <ModalHeader title="Agregar Evolución" onClose={onClose} />
+      <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
+          <FormField label="Fecha"><input type="date" value={f.date} onChange={e => set("date", e.target.value)} style={inputSty} /></FormField>
+          <FormField label="Médico"><input value={f.doctor} onChange={e => set("doctor", e.target.value)} style={inputSty} placeholder="Dr. Nombre" /></FormField>
+        </div>
+        <FormField label="Evolución / Notas">
+          <textarea value={f.notes} onChange={e => set("notes", e.target.value)} rows={6} style={{ ...inputSty, resize: "vertical" }} placeholder="Descripción de la evolución del paciente, observaciones, cambios, indicaciones…" />
+        </FormField>
         <div style={{ display: "flex", gap: 10 }}>
           <GoldBtn onClick={save} disabled={saving}>{saving ? "Guardando…" : "Guardar"}</GoldBtn>
           <GoldBtn outline onClick={onClose}>Cancelar</GoldBtn>
@@ -780,11 +809,7 @@ function AddPhotoForm({ patientId, onSave, onClose }) {
         <input ref={fileRef} type="file" accept="image/*" onChange={handleFile} style={{ display: "none" }} capture="environment" />
         <FormField label="Descripción"><input value={f.label} onChange={e => set("label", e.target.value)} style={inputSty} placeholder="Ej: Frente - Preoperatorio" /></FormField>
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
-          <FormField label="Tipo">
-            <select value={f.type} onChange={e => set("type", e.target.value)} style={inputSty}>
-              {[["antes", "Antes"], ["despues", "Después"], ["intraop", "Intraop"], ["seguimiento", "Seguimiento"]].map(([v, l]) => <option key={v} value={v}>{l}</option>)}
-            </select>
-          </FormField>
+          <FormField label="Tipo"><select value={f.type} onChange={e => set("type", e.target.value)} style={inputSty}>{[["antes","Antes"],["despues","Después"],["intraop","Intraop"],["seguimiento","Seguimiento"]].map(([v,l]) => <option key={v} value={v}>{l}</option>)}</select></FormField>
           <FormField label="Fecha"><input type="date" value={f.date} onChange={e => set("date", e.target.value)} style={inputSty} /></FormField>
         </div>
         <FormField label="Notas"><input value={f.notes} onChange={e => set("notes", e.target.value)} style={inputSty} /></FormField>
@@ -814,7 +839,6 @@ function PhotoViewer({ photo, onClose }) {
   )
 }
 
-// ─── MAIN APP ─────────────────────────────────────────────────────────────
 export default function App() {
   injectStyles()
   const [session, setSession] = useState(null)
@@ -842,22 +866,15 @@ export default function App() {
       <main style={{ flex: 1, overflow: "auto", display: "flex", flexDirection: "column" }}>
         {section === "agenda" && <AgendaSection setModal={setModal} />}
         {section === "patients" && <PatientsSection setModal={setModal} onOpen={(p) => { setSelectedPatient(p); setSection("patientDetail") }} />}
-        {section === "patientDetail" && selectedPatient && (
-          <PatientDetail
-            patient={selectedPatient}
-            setModal={setModal}
-            onBack={() => setSection("patients")}
-            onPatientUpdated={() => {}}
-          />
-        )}
+        {section === "patientDetail" && selectedPatient && <PatientDetail patient={selectedPatient} setModal={setModal} onBack={() => setSection("patients")} />}
         {section === "aiNotes" && <AINotesSection />}
       </main>
-
       {modal && (
         <ModalOverlay onClose={() => setModal(null)}>
           {(modal.type === "addPatient" || modal.type === "editPatient") && <PatientForm patient={modal.patient} onSave={modal.onSave} onClose={() => setModal(null)} />}
           {modal.type === "addAppt" && <AddApptForm onSave={modal.onSave} onClose={() => setModal(null)} />}
           {modal.type === "addHistory" && <AddHistoryForm patientId={modal.patientId} onSave={modal.onSave} onClose={() => setModal(null)} />}
+          {modal.type === "addEvolution" && <AddEvolutionForm patientId={modal.patientId} onSave={modal.onSave} onClose={() => setModal(null)} />}
           {modal.type === "addPhoto" && <AddPhotoForm patientId={modal.patientId} onSave={modal.onSave} onClose={() => setModal(null)} />}
           {modal.type === "viewPhoto" && <PhotoViewer photo={modal.photo} onClose={() => setModal(null)} />}
         </ModalOverlay>
