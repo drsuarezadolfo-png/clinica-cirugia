@@ -737,7 +737,7 @@ function ApplyTemplateForm({ template, patients, onClose }) {
     const surgeryLoc = appt?.location || "_______________"
     const ctrlDateRaw = ctrlDateInput || ""
     const ctrlLocRaw = ctrlLocInput || ""
-    const ctrlDate = ctrlDateFull
+    const ctrlDate = ctrlDateRaw ? (fmtDate(ctrlDateRaw) + (ctrlTimeInput ? " a las " + ctrlTimeInput + " hs" : "")) : "_______________"
     const ctrlLoc = ctrlLocRaw || "_______________"
     let content = template.content
       .replace(/\[PACIENTE\]/g, patient?.name || "_______________")
