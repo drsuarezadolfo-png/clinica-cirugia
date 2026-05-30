@@ -511,6 +511,7 @@ function TemplatesSection({ setModal }) {
               <div className="serif" style={{ fontSize: 18 }}>{t.title}</div>
               <div style={{ display: "flex", gap: 10 }}>
                 <GoldBtn small outline onClick={() => generateForPatient(t)}>📄 Generar PDF</GoldBtn>
+                <button onClick={() => setModal({ type: "editTemplate", template: t, onSave: load })} style={{ background: "transparent", border: "none", color: G.gold, cursor: "pointer", fontSize: 15 }}>✏️</button>
                 <button onClick={() => del(t.id)} style={{ background: "transparent", border: "none", color: G.danger, cursor: "pointer", fontSize: 16 }}>🗑</button>
               </div>
             </div>
@@ -684,11 +685,16 @@ function AddComplicationForm({ patient, onSave, onClose }) {
   </div>
 }
 
-function AddTemplateForm({ defaultType, onSave, onClose }) {
-  const [f, setF] = useState({ type: defaultType || "preop", title: "", content: "" }); const [saving, setSaving] = useState(false); const set = (k, v) => setF(p => ({ ...p, [k]: v }))
-  const save = async () => { if (!f.title.trim() || !f.content.trim()) return; setSaving(true); await supabase.from("templates").insert(f); onSave(); onClose() }
+function AddTemplateForm({ defaultType, template, onSave, onClose }) {
+  const [f, setF] = useState(template ? { type: template.type, title: template.title || "", content: template.content || "" } : { type: defaultType || "preop", title: "", content: "" }); const [saving, setSaving] = useState(false); const set = (k, v) => setF(p => ({ ...p, [k]: v }))
+  const save = async () => {
+    if (!f.title.trim() || !f.content.trim()) return; setSaving(true)
+    if (template) { await supabase.from("templates").update(f).eq("id", template.id) }
+    else { await supabase.from("templates").insert(f) }
+    onSave(); onClose()
+  }
   return <div>
-    <ModalHeader title="Nueva Plantilla de Indicaciones" onClose={onClose} />
+    <ModalHeader title={template ? "Editar Plantilla" : "Nueva Plantilla de Indicaciones"} onClose={onClose} />
     <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
       <FormField label="Tipo"><select value={f.type} onChange={e => set("type", e.target.value)} style={inputSty}><option value="preop">Preoperatoria</option><option value="postop">Postoperatoria</option></select></FormField>
       <FormField label="Título"><input value={f.title} onChange={e => set("title", e.target.value)} style={inputSty} placeholder="Ej: Indicaciones post rinoplastia" /></FormField>
@@ -817,7 +823,7 @@ export default function App() {
       {modal.type === "addHistory" && <AddHistoryForm patientId={modal.patientId} onSave={modal.onSave} onClose={() => setModal(null)} />}
       {modal.type === "addEvolution" && <AddEvolutionForm patientId={modal.patientId} onSave={modal.onSave} onClose={() => setModal(null)} />}
       {modal.type === "addComplication" && <AddComplicationForm patient={modal.patient} onSave={modal.onSave} onClose={() => setModal(null)} />}
-      {modal.type === "addTemplate" && <AddTemplateForm defaultType={modal.defaultType} onSave={modal.onSave} onClose={() => setModal(null)} />}
+      {(modal.type === "addTemplate" || modal.type === "editTemplate") && <AddTemplateForm defaultType={modal.defaultType} template={modal.template} onSave={modal.onSave} onClose={() => setModal(null)} />}
       {modal.type === "applyTemplate" && <ApplyTemplateForm template={modal.template} patients={modal.patients} onClose={() => setModal(null)} />}
       {modal.type === "addPhoto" && <AddPhotoForm patientId={modal.patientId} onSave={modal.onSave} onClose={() => setModal(null)} />}
       {modal.type === "viewPhoto" && <PhotoViewer photo={modal.photo} onClose={() => setModal(null)} />}
