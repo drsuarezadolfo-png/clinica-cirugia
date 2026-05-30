@@ -137,6 +137,7 @@ function AgendaSection({ setModal }) {
             <select value={a.status} onChange={e => updateStatus(a.id, e.target.value)} style={{ padding: "5px 10px", border: `1px solid ${statusColor[a.status] || G.border}`, borderRadius: 4, fontSize: 12, color: statusColor[a.status], background: G.surfaceAlt, outline: "none" }}>
               <option value="pendiente">Pendiente</option><option value="confirmada">Confirmada</option><option value="cancelada">Cancelada</option>
             </select>
+            <button onClick={() => setModal({ type: "editAppt", appt: a, onSave: load })} style={{ background: "transparent", border: "none", color: G.gold, cursor: "pointer", fontSize: 15 }}>✏️</button>
             <button onClick={() => deleteAppt(a.id)} style={{ background: "transparent", border: "none", color: G.danger, cursor: "pointer", fontSize: 16 }}>🗑</button>
           </div>)}
         </div>}
@@ -595,13 +596,19 @@ function PatientForm({ patient, onSave, onClose }) {
   </div>
 }
 
-function AddApptForm({ onSave, onClose }) {
-  const [patients, setPatients] = useState([]); const [f, setF] = useState({ patient_id: "", date: today(), time: "10:00", procedure: "", location: "", status: "pendiente", notes: "" })
+function AddApptForm({ appt, onSave, onClose }) {
+  const [patients, setPatients] = useState([]); const [f, setF] = useState(appt ? { patient_id: appt.patient_id || "", date: appt.date || today(), time: appt.time || "10:00", procedure: appt.procedure || "", location: appt.location || "", status: appt.status || "pendiente", notes: appt.notes || "" } : { patient_id: "", date: today(), time: "10:00", procedure: "", location: "", status: "pendiente", notes: "" })
   const [saving, setSaving] = useState(false); const set = (k, v) => setF(p => ({ ...p, [k]: v }))
   useEffect(() => { supabase.from("patients").select("id,name").order("name").then(({ data }) => setPatients(data || [])) }, [])
-  const save = async () => { if (!f.patient_id || !f.procedure.trim()) return; setSaving(true); const patient = patients.find(p => p.id === f.patient_id); await supabase.from("appointments").insert({ ...f, patient_name: patient?.name || "" }); onSave(); onClose() }
+  const save = async () => {
+    if (!f.patient_id || !f.procedure.trim()) return; setSaving(true)
+    const patient = patients.find(p => p.id === f.patient_id)
+    if (appt) { await supabase.from("appointments").update({ ...f, patient_name: patient?.name || "" }).eq("id", appt.id) }
+    else { await supabase.from("appointments").insert({ ...f, patient_name: patient?.name || "" }) }
+    onSave(); onClose()
+  }
   return <div>
-    <ModalHeader title="Nueva Cita" onClose={onClose} />
+    <ModalHeader title={appt ? "Editar Cita" : "Nueva Cita"} onClose={onClose} />
     <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
       <FormField label="Paciente"><select value={f.patient_id} onChange={e => set("patient_id", e.target.value)} style={inputSty}><option value="">— Seleccionar —</option>{patients.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}</select></FormField>
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
@@ -806,7 +813,7 @@ export default function App() {
     </main>
     {modal && <ModalOverlay onClose={() => setModal(null)} wide={modal.type === "compare"}>
       {(modal.type === "addPatient" || modal.type === "editPatient") && <PatientForm patient={modal.patient} onSave={modal.onSave} onClose={() => setModal(null)} />}
-      {modal.type === "addAppt" && <AddApptForm onSave={modal.onSave} onClose={() => setModal(null)} />}
+      {(modal.type === "addAppt" || modal.type === "editAppt") && <AddApptForm appt={modal.appt} onSave={modal.onSave} onClose={() => setModal(null)} />}
       {modal.type === "addHistory" && <AddHistoryForm patientId={modal.patientId} onSave={modal.onSave} onClose={() => setModal(null)} />}
       {modal.type === "addEvolution" && <AddEvolutionForm patientId={modal.patientId} onSave={modal.onSave} onClose={() => setModal(null)} />}
       {modal.type === "addComplication" && <AddComplicationForm patient={modal.patient} onSave={modal.onSave} onClose={() => setModal(null)} />}
