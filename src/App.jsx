@@ -132,7 +132,7 @@ function AgendaSection({ setModal }) {
               <div style={{ fontSize: 11, color: G.muted, textTransform: "uppercase" }}>{a.date ? new Date(a.date + "T12:00:00").toLocaleDateString("es-MX", { month: "short" }) : ""}</div>
             </div>
             <div style={{ width: 1, height: 40, background: G.border }} />
-            <div style={{ flex: 1 }}><div style={{ fontSize: 15, fontWeight: 500 }}>{a.patient_name}</div><div style={{ fontSize: 13, color: G.muted, marginTop: 2 }}>{a.procedure}</div>{a.notes && <div style={{ fontSize: 12, color: G.accent, marginTop: 2 }}>📝 {a.notes}</div>}</div>
+            <div style={{ flex: 1 }}><div style={{ fontSize: 15, fontWeight: 500 }}>{a.patient_name}</div><div style={{ fontSize: 13, color: G.muted, marginTop: 2 }}>{a.procedure}</div>{a.location && <div style={{ fontSize: 12, color: G.info, marginTop: 2 }}>📍 {a.location}</div>}{a.notes && <div style={{ fontSize: 12, color: G.accent, marginTop: 2 }}>📝 {a.notes}</div>}</div>
             <div style={{ fontSize: 13, color: G.muted }}>{a.time}</div>
             <select value={a.status} onChange={e => updateStatus(a.id, e.target.value)} style={{ padding: "5px 10px", border: `1px solid ${statusColor[a.status] || G.border}`, borderRadius: 4, fontSize: 12, color: statusColor[a.status], background: G.surfaceAlt, outline: "none" }}>
               <option value="pendiente">Pendiente</option><option value="confirmada">Confirmada</option><option value="cancelada">Cancelada</option>
@@ -250,7 +250,7 @@ function HistorySection({ patient, setModal }) {
       {loading ? <div style={{ display: "flex", justifyContent: "center", padding: 40 }}><Spinner /></div> : procedures.length === 0 ? <EmptyState icon="📋" msg="Sin procedimientos" /> :
         procedures.map(h => <div key={h.id} style={{ background: G.surface, border: `1px solid ${G.border}`, borderRadius: 8, padding: "20px 24px", marginBottom: 14 }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
-            <div><div className="serif" style={{ fontSize: 18 }}>{h.procedure}</div><div style={{ fontSize: 12, color: G.muted, marginTop: 4 }}>{fmtDate(h.date)} · {h.surgeon} · Anestesia: {h.anesthesia} · Duración: {h.duration}</div></div>
+            <div><div className="serif" style={{ fontSize: 18 }}>{h.procedure}</div><div style={{ fontSize: 12, color: G.muted, marginTop: 4 }}>{fmtDate(h.date)} · {h.surgeon} · Anestesia: {h.anesthesia} · Duración: {h.duration}</div>{h.location && <div style={{ fontSize: 12, color: G.info, marginTop: 4 }}>📍 {h.location}</div>}</div>
             <button onClick={() => del("clinical_history", h.id, setProcedures)} style={{ background: "transparent", border: "none", color: G.danger, cursor: "pointer", fontSize: 16 }}>🗑</button>
           </div>
           {h.notes && <div style={{ marginTop: 14, padding: "12px 16px", background: G.surfaceAlt, borderRadius: 6, fontSize: 13, lineHeight: 1.7 }}>{h.notes}</div>}
@@ -281,7 +281,7 @@ function HistorySection({ patient, setModal }) {
       {loading ? <div style={{ display: "flex", justifyContent: "center", padding: 40 }}><Spinner /></div> : complications.length === 0 ? <EmptyState icon="✅" msg="Sin complicaciones registradas" /> :
         complications.map(c => <div key={c.id} style={{ background: G.surface, border: `1px solid ${G.border}`, borderRadius: 8, padding: "20px 24px", marginBottom: 14 }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
-            <div><div className="serif" style={{ fontSize: 18 }}>{c.complication}</div><div style={{ fontSize: 12, color: G.muted, marginTop: 4 }}>{fmtDate(c.date)} · {c.procedure || "—"}</div></div>
+            <div><div className="serif" style={{ fontSize: 18 }}>{c.complication}</div><div style={{ fontSize: 12, color: G.muted, marginTop: 4 }}>{fmtDate(c.date)} · {c.procedure || "—"}{c.location ? " · 📍 " + c.location : ""}</div></div>
             <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
               {c.severity && <Tag label={c.severity} color={sevColor[c.severity] || G.muted} />}
               <button onClick={() => del("complications", c.id, setComplications)} style={{ background: "transparent", border: "none", color: G.danger, cursor: "pointer", fontSize: 16 }}>🗑</button>
@@ -393,6 +393,12 @@ function StatsSection() {
   complications.forEach(c => { if (sevCount[c.severity] !== undefined) sevCount[c.severity]++ })
   const compRate = procedures.length > 0 ? ((complications.length / procedures.length) * 100).toFixed(1) : 0
 
+  // Por sede/lugar: cirugías y complicaciones
+  const locStats = {}
+  procedures.forEach(p => { const loc = (p.location || "Sin especificar").trim(); if (!locStats[loc]) locStats[loc] = { surgeries: 0, comps: 0 }; locStats[loc].surgeries++ })
+  complications.forEach(co => { const loc = (co.location || "Sin especificar").trim(); if (!locStats[loc]) locStats[loc] = { surgeries: 0, comps: 0 }; locStats[loc].comps++ })
+  const locRows = Object.entries(locStats).map(([loc, s]) => ({ loc, surgeries: s.surgeries, comps: s.comps, rate: s.surgeries > 0 ? ((s.comps / s.surgeries) * 100).toFixed(1) : "—" })).sort((a, b) => b.surgeries - a.surgeries)
+
   const Card = ({ children, title }) => <div style={{ background: G.surface, border: `1px solid ${G.border}`, borderRadius: 10, padding: "24px" }}><div className="serif" style={{ fontSize: 18, marginBottom: 20 }}>{title}</div>{children}</div>
 
   return <div className="fade-in" style={{ flex: 1 }}>
@@ -438,6 +444,35 @@ function StatsSection() {
                 <div className="serif" style={{ fontSize: 32, color }}>{val}</div>
                 <div style={{ fontSize: 12, color: G.muted, marginTop: 4 }}>{label}</div>
               </div>)}
+          </div>}
+      </Card>
+
+      {/* Por sede / lugar */}
+      <Card title="Cirugías y complicaciones por sede">
+        {locRows.length === 0 ? <EmptyState icon="📍" msg="Sin datos de sede aún" /> :
+          <div style={{ overflowX: "auto" }}>
+            <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+              <thead>
+                <tr style={{ textAlign: "left", color: G.muted, fontSize: 11, textTransform: "uppercase", letterSpacing: "0.06em" }}>
+                  <th style={{ padding: "10px 12px", borderBottom: `1px solid ${G.border}` }}>Sede / Lugar</th>
+                  <th style={{ padding: "10px 12px", borderBottom: `1px solid ${G.border}`, textAlign: "center" }}>Cirugías</th>
+                  <th style={{ padding: "10px 12px", borderBottom: `1px solid ${G.border}`, textAlign: "center" }}>Complicaciones</th>
+                  <th style={{ padding: "10px 12px", borderBottom: `1px solid ${G.border}`, textAlign: "center" }}>Tasa</th>
+                </tr>
+              </thead>
+              <tbody>
+                {locRows.map(r => {
+                  const rateNum = parseFloat(r.rate)
+                  const rateColor = isNaN(rateNum) ? G.muted : rateNum >= 10 ? G.danger : rateNum >= 5 ? G.warn : G.success
+                  return <tr key={r.loc}>
+                    <td style={{ padding: "12px", borderBottom: `1px solid ${G.border}` }}>📍 {r.loc}</td>
+                    <td style={{ padding: "12px", borderBottom: `1px solid ${G.border}`, textAlign: "center", fontWeight: 500 }}>{r.surgeries}</td>
+                    <td style={{ padding: "12px", borderBottom: `1px solid ${G.border}`, textAlign: "center", color: r.comps > 0 ? G.warn : G.muted }}>{r.comps}</td>
+                    <td style={{ padding: "12px", borderBottom: `1px solid ${G.border}`, textAlign: "center" }}><span style={{ color: rateColor, fontWeight: 500 }}>{r.rate}{r.rate !== "—" ? "%" : ""}</span></td>
+                  </tr>
+                })}
+              </tbody>
+            </table>
           </div>}
       </Card>
     </div>
@@ -561,7 +596,7 @@ function PatientForm({ patient, onSave, onClose }) {
 }
 
 function AddApptForm({ onSave, onClose }) {
-  const [patients, setPatients] = useState([]); const [f, setF] = useState({ patient_id: "", date: today(), time: "10:00", procedure: "", status: "pendiente", notes: "" })
+  const [patients, setPatients] = useState([]); const [f, setF] = useState({ patient_id: "", date: today(), time: "10:00", procedure: "", location: "", status: "pendiente", notes: "" })
   const [saving, setSaving] = useState(false); const set = (k, v) => setF(p => ({ ...p, [k]: v }))
   useEffect(() => { supabase.from("patients").select("id,name").order("name").then(({ data }) => setPatients(data || [])) }, [])
   const save = async () => { if (!f.patient_id || !f.procedure.trim()) return; setSaving(true); const patient = patients.find(p => p.id === f.patient_id); await supabase.from("appointments").insert({ ...f, patient_name: patient?.name || "" }); onSave(); onClose() }
@@ -574,6 +609,7 @@ function AddApptForm({ onSave, onClose }) {
         <FormField label="Hora"><input type="time" value={f.time} onChange={e => set("time", e.target.value)} style={inputSty} /></FormField>
       </div>
       <FormField label="Procedimiento"><input value={f.procedure} onChange={e => set("procedure", e.target.value)} style={inputSty} /></FormField>
+      <FormField label="Lugar / Sede"><input value={f.location} onChange={e => set("location", e.target.value)} style={inputSty} placeholder="Ej: Sanatorio Central, Quirófano 2…" /></FormField>
       <FormField label="Estado"><select value={f.status} onChange={e => set("status", e.target.value)} style={inputSty}><option value="pendiente">Pendiente</option><option value="confirmada">Confirmada</option><option value="cancelada">Cancelada</option></select></FormField>
       <FormField label="Notas"><input value={f.notes} onChange={e => set("notes", e.target.value)} style={inputSty} /></FormField>
       <div style={{ display: "flex", gap: 10 }}><GoldBtn onClick={save} disabled={saving}>{saving ? "Guardando…" : "Guardar"}</GoldBtn><GoldBtn outline onClick={onClose}>Cancelar</GoldBtn></div>
@@ -582,7 +618,7 @@ function AddApptForm({ onSave, onClose }) {
 }
 
 function AddHistoryForm({ patientId, onSave, onClose }) {
-  const [f, setF] = useState({ date: today(), procedure: "", surgeon: "", anesthesia: "General", duration: "", notes: "", follow_up: "" })
+  const [f, setF] = useState({ date: today(), procedure: "", surgeon: "", anesthesia: "General", duration: "", location: "", notes: "", follow_up: "" })
   const [saving, setSaving] = useState(false); const set = (k, v) => setF(p => ({ ...p, [k]: v }))
   const save = async () => { if (!f.procedure.trim()) return; setSaving(true); await supabase.from("clinical_history").insert({ ...f, patient_id: patientId }); onSave(); onClose() }
   return <div>
@@ -597,6 +633,7 @@ function AddHistoryForm({ patientId, onSave, onClose }) {
         <FormField label="Anestesia"><select value={f.anesthesia} onChange={e => set("anesthesia", e.target.value)} style={inputSty}>{["General", "Local", "Sedación", "Epidural"].map(a => <option key={a}>{a}</option>)}</select></FormField>
         <FormField label="Duración"><input value={f.duration} onChange={e => set("duration", e.target.value)} style={inputSty} placeholder="2h 30min" /></FormField>
       </div>
+      <FormField label="Lugar / Sede"><input value={f.location} onChange={e => set("location", e.target.value)} style={inputSty} placeholder="Ej: Sanatorio Central, Quirófano 2…" /></FormField>
       <FormField label="Notas clínicas"><textarea value={f.notes} onChange={e => set("notes", e.target.value)} rows={4} style={{ ...inputSty, resize: "vertical" }} /></FormField>
       <FormField label="Fecha de seguimiento"><input type="date" value={f.follow_up} onChange={e => set("follow_up", e.target.value)} style={inputSty} /></FormField>
       <div style={{ display: "flex", gap: 10 }}><GoldBtn onClick={save} disabled={saving}>{saving ? "Guardando…" : "Guardar"}</GoldBtn><GoldBtn outline onClick={onClose}>Cancelar</GoldBtn></div>
@@ -621,7 +658,7 @@ function AddEvolutionForm({ patientId, onSave, onClose }) {
 }
 
 function AddComplicationForm({ patient, onSave, onClose }) {
-  const [f, setF] = useState({ date: today(), procedure: "", complication: "", severity: "Leve", resolution: "" })
+  const [f, setF] = useState({ date: today(), procedure: "", complication: "", severity: "Leve", location: "", resolution: "" })
   const [saving, setSaving] = useState(false); const set = (k, v) => setF(p => ({ ...p, [k]: v }))
   const save = async () => { if (!f.complication.trim()) return; setSaving(true); await supabase.from("complications").insert({ ...f, patient_id: patient.id, patient_name: patient.name }); onSave(); onClose() }
   return <div>
@@ -633,6 +670,7 @@ function AddComplicationForm({ patient, onSave, onClose }) {
         <FormField label="Severidad"><select value={f.severity} onChange={e => set("severity", e.target.value)} style={inputSty}>{["Leve", "Moderada", "Grave"].map(s => <option key={s}>{s}</option>)}</select></FormField>
       </div>
       <FormField label="Procedimiento relacionado"><input value={f.procedure} onChange={e => set("procedure", e.target.value)} style={inputSty} placeholder="Ej: Rinoplastia" /></FormField>
+      <FormField label="Lugar / Sede"><input value={f.location} onChange={e => set("location", e.target.value)} style={inputSty} placeholder="Ej: Sanatorio Central, Quirófano 2…" /></FormField>
       <FormField label="Resolución / manejo"><textarea value={f.resolution} onChange={e => set("resolution", e.target.value)} rows={3} style={{ ...inputSty, resize: "vertical" }} /></FormField>
       <div style={{ display: "flex", gap: 10 }}><GoldBtn onClick={save} disabled={saving}>{saving ? "Guardando…" : "Guardar"}</GoldBtn><GoldBtn outline onClick={onClose}>Cancelar</GoldBtn></div>
     </div>
