@@ -706,17 +706,42 @@ function AddTemplateForm({ defaultType, template, onSave, onClose }) {
 
 function ApplyTemplateForm({ template, patients, onClose }) {
   const [patientId, setPatientId] = useState("")
+  const [appts, setAppts] = useState([])
+  const [apptId, setApptId] = useState("")
+  const isPreop = template.type === "preop"
+
+  useEffect(() => {
+    if (!patientId) { setAppts([]); setApptId(""); return }
+    supabase.from("appointments").select("*").eq("patient_id", patientId).order("date", { ascending: false }).then(({ data }) => setAppts(data || []))
+  }, [patientId])
+
   const generate = () => {
     const patient = patients.find(p => p.id === patientId)
-    const content = template.content.replace(/\[PACIENTE\]/g, patient?.name || "_______________")
-    downloadPDF(`indicaciones-${template.title.replace(/\s+/g, "-")}-${patient?.name?.replace(/\s+/g, "-") || ""}.html`, `<h1>${template.title}</h1><div class="info-grid"><div class="field"><div class="field-label">Paciente</div><div class="field-value">${patient?.name || "—"}</div></div><div class="field"><div class="field-label">Fecha</div><div class="field-value">${new Date().toLocaleDateString("es-MX")}</div></div></div><div class="card"><div class="notes">${content}</div></div><div class="footer">Clínica de Cirugía Plástica · ${new Date().toLocaleDateString("es-MX")}</div>`)
+    const appt = appts.find(a => a.id === apptId)
+    const surgeryDate = appt?.date ? fmtDate(appt.date) : "_______________"
+    const surgeryLoc = appt?.location || "_______________"
+    let content = template.content
+      .replace(/\[PACIENTE\]/g, patient?.name || "_______________")
+      .replace(/\[FECHA\]/g, surgeryDate)
+      .replace(/\[LUGAR\]/g, surgeryLoc)
+    const surgeryInfo = isPreop ? `<div class="field"><div class="field-label">Fecha de cirugía</div><div class="field-value">${surgeryDate}</div></div><div class="field"><div class="field-label">Lugar de cirugía</div><div class="field-value">${surgeryLoc}</div></div>` : ""
+    downloadPDF(`indicaciones-${template.title.replace(/\s+/g, "-")}-${patient?.name?.replace(/\s+/g, "-") || ""}.html`, `<h1>${template.title}</h1><div class="info-grid"><div class="field"><div class="field-label">Paciente</div><div class="field-value">${patient?.name || "—"}</div></div><div class="field"><div class="field-label">Emitido</div><div class="field-value">${new Date().toLocaleDateString("es-MX")}</div></div>${surgeryInfo}</div><div class="card"><div class="notes">${content}</div></div><div class="footer">Clínica de Cirugía Plástica · ${new Date().toLocaleDateString("es-MX")}</div>`)
     onClose()
   }
+
   return <div>
     <ModalHeader title="Generar Indicaciones para Paciente" onClose={onClose} />
     <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
       <div style={{ fontSize: 13, color: G.muted }}>Plantilla: <strong>{template.title}</strong></div>
       <FormField label="Paciente"><select value={patientId} onChange={e => setPatientId(e.target.value)} style={inputSty}><option value="">— Seleccionar —</option>{patients.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}</select></FormField>
+      {isPreop && patientId && <FormField label="Cita de cirugía (fecha y lugar)">
+        <select value={apptId} onChange={e => setApptId(e.target.value)} style={inputSty}>
+          <option value="">— Seleccionar cita —</option>
+          {appts.map(a => <option key={a.id} value={a.id}>{fmtDate(a.date)} · {a.procedure}{a.location ? " · " + a.location : ""}</option>)}
+        </select>
+      </FormField>}
+      {isPreop && patientId && appts.length === 0 && <div style={{ fontSize: 12, color: G.warn }}>Este paciente no tiene citas. La fecha y lugar saldrán en blanco.</div>}
+      <div style={{ fontSize: 11, color: G.muted }}>Tip: usa [PACIENTE], [FECHA] y [LUGAR] en la plantilla para insertar esos datos automáticamente.</div>
       <div style={{ display: "flex", gap: 10 }}><GoldBtn onClick={generate} disabled={!patientId}>📥 Generar PDF</GoldBtn><GoldBtn outline onClick={onClose}>Cancelar</GoldBtn></div>
     </div>
   </div>
