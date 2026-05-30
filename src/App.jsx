@@ -48,23 +48,12 @@ function ModalHeader({ title, onClose }) {
 
 const pdfStyles = `body{font-family:Georgia,serif;max-width:800px;margin:40px auto;color:#2C2826;line-height:1.7}h1{font-size:26px;color:#B8975A;border-bottom:2px solid #B8975A;padding-bottom:10px;margin-bottom:20px}h2{font-size:18px;margin:28px 0 12px}.info-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:24px}.field{background:#F3EFE8;padding:10px 14px;border-radius:6px}.field-label{font-size:11px;color:#8A7F74;text-transform:uppercase;letter-spacing:0.08em}.field-value{font-size:14px;margin-top:4px}.card{background:#F9F6F1;border:1px solid #E5DDD0;border-radius:8px;padding:18px;margin:12px 0}.card-title{font-size:16px;font-weight:bold;margin-bottom:6px}.card-meta{color:#8A7F74;font-size:12px;margin-bottom:8px}.notes{background:#fff;border-left:3px solid #B8975A;padding:10px 14px;margin-top:10px;font-size:13px;white-space:pre-wrap}.footer{color:#8A7F74;font-size:11px;border-top:1px solid #E5DDD0;padding-top:14px;margin-top:40px}`
 const downloadPDF = (filename, htmlContent) => {
-  // Vista a pantalla completa dentro de la app (funciona en iPhone y escritorio)
-  const existing = document.getElementById("pdf-overlay")
-  if (existing) existing.remove()
-  const overlay = document.createElement("div")
-  overlay.id = "pdf-overlay"
-  overlay.style.cssText = "position:fixed;inset:0;z-index:99999;background:#fff;overflow:auto;-webkit-overflow-scrolling:touch"
-  const bar = `<div class="no-print" style="position:sticky;top:0;background:#2C2826;padding:12px;display:flex;gap:10px;justify-content:center;align-items:center;flex-wrap:wrap">
-    <button id="pdf-print-btn" style="background:#B8975A;color:#fff;border:none;padding:10px 22px;border-radius:6px;font-size:15px;font-family:sans-serif;cursor:pointer">📄 Imprimir / Guardar PDF</button>
-    <button id="pdf-close-btn" style="background:transparent;color:#D4B57A;border:1px solid #D4B57A;padding:10px 22px;border-radius:6px;font-size:15px;font-family:sans-serif;cursor:pointer">✕ Cerrar</button>
-  </div>`
-  const printStyle = `<style id="pdf-print-style">@media print{body>*:not(#pdf-overlay){display:none!important}#pdf-overlay{position:static!important}#pdf-overlay .no-print{display:none!important}}${pdfStyles}</style>`
-  overlay.innerHTML = printStyle + bar + `<div style="max-width:800px;margin:0 auto;padding:20px">${htmlContent}</div>`
-  document.body.appendChild(overlay)
-  document.getElementById("pdf-print-btn").onclick = () => window.print()
-  document.getElementById("pdf-close-btn").onclick = () => overlay.remove()
+  const fullHtml = `<!DOCTYPE html><html><head><meta charset="UTF-8"><style>${pdfStyles}</style></head><body>${htmlContent}</body></html>`
+  const blob = new Blob([fullHtml], { type: "text/html;charset=utf-8" })
+  const url = URL.createObjectURL(blob)
+  const link = document.createElement("a"); link.href = url; link.download = filename; link.click()
+  URL.revokeObjectURL(url)
 }
-
 const downloadPhoto = (photo) => {
   const link = document.createElement("a"); link.href = photo.url
   link.download = `${photo.label || "foto"}-${photo.date || "sf"}.jpg`; link.target = "_blank"; link.click()
@@ -763,9 +752,9 @@ function ApplyTemplateForm({ template, patients, onClose }) {
         </select>
       </FormField>}
       {isPreop && patientId && appts.length === 0 && <div style={{ fontSize: 12, color: G.warn }}>Este paciente no tiene citas. La fecha y lugar saldrán en blanco.</div>}
-      {isPostop && <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 14 }}>
+      {isPostop && <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
         <FormField label="Fecha de control"><input type="date" value={ctrlDateInput} onChange={e => setCtrlDateInput(e.target.value)} style={inputSty} /></FormField>
-        <FormField label="Hora"><input type="time" value={ctrlTimeInput} onChange={e => setCtrlTimeInput(e.target.value)} style={inputSty} /></FormField>
+        <FormField label="Hora de control"><input type="time" value={ctrlTimeInput} onChange={e => setCtrlTimeInput(e.target.value)} style={inputSty} /></FormField>
         <FormField label="Lugar de control"><input value={ctrlLocInput} onChange={e => setCtrlLocInput(e.target.value)} style={inputSty} placeholder="Ej: Consultorio" /></FormField>
       </div>}
       <div style={{ fontSize: 11, color: G.muted }}>Tip: usa [PACIENTE], [FECHA], [LUGAR]{isPostop ? ", [FECHA_CONTROL], [LUGAR_CONTROL]" : ""} en la plantilla para insertar esos datos automáticamente.</div>
