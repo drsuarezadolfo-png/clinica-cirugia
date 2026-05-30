@@ -675,6 +675,7 @@ function AddPhotoForm({ patientId, onSave, onClose }) {
   const [f, setF] = useState({ label: "", type: "antes", date: today(), notes: "" })
   const [preview, setPreview] = useState(""); const [saving, setSaving] = useState(false); const fileRef = useRef()
   const set = (k, v) => setF(p => ({ ...p, [k]: v }))
+  const cameraRef = useRef()
   const handleFile = (e) => { const file = e.target.files[0]; if (!file) return; const reader = new FileReader(); reader.onload = ev => setPreview(ev.target.result); reader.readAsDataURL(file) }
   const save = async () => {
     if (!preview) return; setSaving(true)
@@ -692,10 +693,15 @@ function AddPhotoForm({ patientId, onSave, onClose }) {
   return <div>
     <ModalHeader title="Agregar Fotografía" onClose={onClose} />
     <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-      <div onClick={() => fileRef.current.click()} style={{ border: `2px dashed ${preview ? G.gold : G.border}`, borderRadius: 8, padding: 24, textAlign: "center", cursor: "pointer", background: G.surfaceAlt }}>
-        {preview ? <img src={preview} alt="" style={{ maxHeight: 180, maxWidth: "100%", borderRadius: 6, objectFit: "contain" }} /> : <div style={{ color: G.muted, fontSize: 13 }}>📷<br />Toca para seleccionar imagen</div>}
+      <div style={{ border: `2px dashed ${preview ? G.gold : G.border}`, borderRadius: 8, padding: 24, textAlign: "center", background: G.surfaceAlt }}>
+        {preview ? <img src={preview} alt="" style={{ maxHeight: 180, maxWidth: "100%", borderRadius: 6, objectFit: "contain" }} /> : <div style={{ color: G.muted, fontSize: 13 }}>📷<br />Selecciona una opción abajo</div>}
       </div>
-      <input ref={fileRef} type="file" accept="image/*" onChange={handleFile} style={{ display: "none" }} capture="environment" />
+      <div style={{ display: "flex", gap: 10 }}>
+        <button onClick={() => cameraRef.current.click()} style={{ flex: 1, padding: "10px", background: `${G.gold}18`, border: `1px solid ${G.gold}40`, borderRadius: 6, color: G.goldDark, fontSize: 13, cursor: "pointer" }}>📷 Tomar foto</button>
+        <button onClick={() => fileRef.current.click()} style={{ flex: 1, padding: "10px", background: `${G.gold}18`, border: `1px solid ${G.gold}40`, borderRadius: 6, color: G.goldDark, fontSize: 13, cursor: "pointer" }}>🖼 Galería / Archivos</button>
+      </div>
+      <input ref={cameraRef} type="file" accept="image/*" capture="environment" onChange={handleFile} style={{ display: "none" }} />
+      <input ref={fileRef} type="file" accept="image/*" onChange={handleFile} style={{ display: "none" }} />
       <FormField label="Descripción"><input value={f.label} onChange={e => set("label", e.target.value)} style={inputSty} placeholder="Ej: Frente - Preoperatorio" /></FormField>
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
         <FormField label="Tipo"><select value={f.type} onChange={e => set("type", e.target.value)} style={inputSty}>{[["antes", "Antes"], ["despues", "Después"], ["intraop", "Intraop"], ["seguimiento", "Seguimiento"]].map(([v, l]) => <option key={v} value={v}>{l}</option>)}</select></FormField>
