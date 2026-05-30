@@ -48,11 +48,17 @@ function ModalHeader({ title, onClose }) {
 
 const pdfStyles = `body{font-family:Georgia,serif;max-width:800px;margin:40px auto;color:#2C2826;line-height:1.7}h1{font-size:26px;color:#B8975A;border-bottom:2px solid #B8975A;padding-bottom:10px;margin-bottom:20px}h2{font-size:18px;margin:28px 0 12px}.info-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:24px}.field{background:#F3EFE8;padding:10px 14px;border-radius:6px}.field-label{font-size:11px;color:#8A7F74;text-transform:uppercase;letter-spacing:0.08em}.field-value{font-size:14px;margin-top:4px}.card{background:#F9F6F1;border:1px solid #E5DDD0;border-radius:8px;padding:18px;margin:12px 0}.card-title{font-size:16px;font-weight:bold;margin-bottom:6px}.card-meta{color:#8A7F74;font-size:12px;margin-bottom:8px}.notes{background:#fff;border-left:3px solid #B8975A;padding:10px 14px;margin-top:10px;font-size:13px;white-space:pre-wrap}.footer{color:#8A7F74;font-size:11px;border-top:1px solid #E5DDD0;padding-top:14px;margin-top:40px}`
 const downloadPDF = (filename, htmlContent) => {
-  const fullHtml = `<!DOCTYPE html><html><head><meta charset="UTF-8"><style>${pdfStyles}</style></head><body>${htmlContent}</body></html>`
-  const blob = new Blob([fullHtml], { type: "text/html;charset=utf-8" })
-  const url = URL.createObjectURL(blob)
-  const link = document.createElement("a"); link.href = url; link.download = filename; link.click()
-  URL.revokeObjectURL(url)
+  const printBtn = `<div class="no-print" style="position:fixed;top:0;left:0;right:0;background:#2C2826;padding:12px;text-align:center;z-index:9999"><button onclick="window.print()" style="background:#B8975A;color:#fff;border:none;padding:10px 24px;border-radius:6px;font-size:15px;font-family:sans-serif;cursor:pointer">📄 Guardar como PDF / Imprimir</button> <span style="color:#D4B57A;font-size:12px;margin-left:8px;font-family:sans-serif">(en iPhone: tocar y elegir Imprimir → pellizcar para abrir PDF → Compartir)</span></div>`
+  const fullHtml = `<!DOCTYPE html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${filename}</title><style>${pdfStyles}@media print{.no-print{display:none!important}}body{padding-top:70px}</style></head><body>${printBtn}${htmlContent}</body></html>`
+  const w = window.open("", "_blank")
+  if (w) { w.document.open(); w.document.write(fullHtml); w.document.close() }
+  else {
+    // fallback: blob download for desktop if popup blocked
+    const blob = new Blob([fullHtml], { type: "text/html;charset=utf-8" })
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement("a"); link.href = url; link.download = filename; link.click()
+    URL.revokeObjectURL(url)
+  }
 }
 const downloadPhoto = (photo) => {
   const link = document.createElement("a"); link.href = photo.url
