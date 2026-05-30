@@ -708,7 +708,10 @@ function ApplyTemplateForm({ template, patients, onClose }) {
   const [patientId, setPatientId] = useState("")
   const [appts, setAppts] = useState([])
   const [apptId, setApptId] = useState("")
+  const [controlDate, setControlDate] = useState("")
+  const [controlLoc, setControlLoc] = useState("")
   const isPreop = template.type === "preop"
+  const isPostop = template.type === "postop"
 
   useEffect(() => {
     if (!patientId) { setAppts([]); setApptId(""); return }
@@ -720,12 +723,17 @@ function ApplyTemplateForm({ template, patients, onClose }) {
     const appt = appts.find(a => a.id === apptId)
     const surgeryDate = appt?.date ? fmtDate(appt.date) : "_______________"
     const surgeryLoc = appt?.location || "_______________"
+    const ctrlDate = controlDate ? fmtDate(controlDate) : "_______________"
+    const ctrlLoc = controlLoc || "_______________"
     let content = template.content
       .replace(/\[PACIENTE\]/g, patient?.name || "_______________")
       .replace(/\[FECHA\]/g, surgeryDate)
       .replace(/\[LUGAR\]/g, surgeryLoc)
+      .replace(/\[FECHA_CONTROL\]/g, ctrlDate)
+      .replace(/\[LUGAR_CONTROL\]/g, ctrlLoc)
     const surgeryInfo = isPreop ? `<div class="field"><div class="field-label">Fecha de cirugía</div><div class="field-value">${surgeryDate}</div></div><div class="field"><div class="field-label">Lugar de cirugía</div><div class="field-value">${surgeryLoc}</div></div>` : ""
-    downloadPDF(`indicaciones-${template.title.replace(/\s+/g, "-")}-${patient?.name?.replace(/\s+/g, "-") || ""}.html`, `<h1>${template.title}</h1><div class="info-grid"><div class="field"><div class="field-label">Paciente</div><div class="field-value">${patient?.name || "—"}</div></div><div class="field"><div class="field-label">Emitido</div><div class="field-value">${new Date().toLocaleDateString("es-MX")}</div></div>${surgeryInfo}</div><div class="card"><div class="notes">${content}</div></div><div class="footer">Clínica de Cirugía Plástica · ${new Date().toLocaleDateString("es-MX")}</div>`)
+    const controlInfo = isPostop && (controlDate || controlLoc) ? `<div class="field"><div class="field-label">Fecha de control</div><div class="field-value">${ctrlDate}</div></div><div class="field"><div class="field-label">Lugar de control</div><div class="field-value">${ctrlLoc}</div></div>` : ""
+    downloadPDF(`indicaciones-${template.title.replace(/\s+/g, "-")}-${patient?.name?.replace(/\s+/g, "-") || ""}.html`, `<h1>${template.title}</h1><div class="info-grid"><div class="field"><div class="field-label">Paciente</div><div class="field-value">${patient?.name || "—"}</div></div><div class="field"><div class="field-label">Emitido</div><div class="field-value">${new Date().toLocaleDateString("es-MX")}</div></div>${surgeryInfo}${controlInfo}</div><div class="card"><div class="notes">${content}</div></div><div class="footer">Clínica de Cirugía Plástica · ${new Date().toLocaleDateString("es-MX")}</div>`)
     onClose()
   }
 
@@ -741,7 +749,11 @@ function ApplyTemplateForm({ template, patients, onClose }) {
         </select>
       </FormField>}
       {isPreop && patientId && appts.length === 0 && <div style={{ fontSize: 12, color: G.warn }}>Este paciente no tiene citas. La fecha y lugar saldrán en blanco.</div>}
-      <div style={{ fontSize: 11, color: G.muted }}>Tip: usa [PACIENTE], [FECHA] y [LUGAR] en la plantilla para insertar esos datos automáticamente.</div>
+      {isPostop && <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
+        <FormField label="Fecha de control"><input type="date" value={controlDate} onChange={e => setControlDate(e.target.value)} style={inputSty} /></FormField>
+        <FormField label="Lugar de control"><input value={controlLoc} onChange={e => setControlLoc(e.target.value)} style={inputSty} placeholder="Ej: Consultorio" /></FormField>
+      </div>}
+      <div style={{ fontSize: 11, color: G.muted }}>Tip: usa [PACIENTE], [FECHA], [LUGAR]{isPostop ? ", [FECHA_CONTROL], [LUGAR_CONTROL]" : ""} en la plantilla para insertar esos datos automáticamente.</div>
       <div style={{ display: "flex", gap: 10 }}><GoldBtn onClick={generate} disabled={!patientId}>📥 Generar PDF</GoldBtn><GoldBtn outline onClick={onClose}>Cancelar</GoldBtn></div>
     </div>
   </div>
