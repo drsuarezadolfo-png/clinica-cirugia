@@ -709,6 +709,7 @@ function ApplyTemplateForm({ template, patients, onClose }) {
   const [appts, setAppts] = useState([])
   const [apptId, setApptId] = useState("")
   const [ctrlDateInput, setCtrlDateInput] = useState("")
+  const [ctrlTimeInput, setCtrlTimeInput] = useState("")
   const [ctrlLocInput, setCtrlLocInput] = useState("")
   const isPreop = template.type === "preop"
   const isPostop = template.type === "postop"
@@ -725,7 +726,7 @@ function ApplyTemplateForm({ template, patients, onClose }) {
     const surgeryLoc = appt?.location || "_______________"
     const ctrlDateRaw = ctrlDateInput || ""
     const ctrlLocRaw = ctrlLocInput || ""
-    const ctrlDate = ctrlDateRaw ? fmtDate(ctrlDateRaw) : "_______________"
+    const ctrlDate = ctrlDateFull
     const ctrlLoc = ctrlLocRaw || "_______________"
     let content = template.content
       .replace(/\[PACIENTE\]/g, patient?.name || "_______________")
@@ -751,8 +752,9 @@ function ApplyTemplateForm({ template, patients, onClose }) {
         </select>
       </FormField>}
       {isPreop && patientId && appts.length === 0 && <div style={{ fontSize: 12, color: G.warn }}>Este paciente no tiene citas. La fecha y lugar saldrán en blanco.</div>}
-      {isPostop && <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
+      {isPostop && <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 14 }}>
         <FormField label="Fecha de control"><input type="date" value={ctrlDateInput} onChange={e => setCtrlDateInput(e.target.value)} style={inputSty} /></FormField>
+        <FormField label="Hora"><input type="time" value={ctrlTimeInput} onChange={e => setCtrlTimeInput(e.target.value)} style={inputSty} /></FormField>
         <FormField label="Lugar de control"><input value={ctrlLocInput} onChange={e => setCtrlLocInput(e.target.value)} style={inputSty} placeholder="Ej: Consultorio" /></FormField>
       </div>}
       <div style={{ fontSize: 11, color: G.muted }}>Tip: usa [PACIENTE], [FECHA], [LUGAR]{isPostop ? ", [FECHA_CONTROL], [LUGAR_CONTROL]" : ""} en la plantilla para insertar esos datos automáticamente.</div>
