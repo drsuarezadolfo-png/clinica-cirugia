@@ -116,34 +116,88 @@ function PageHeader({ title, subtitle, action }) {
 // ─── AGENDA ───────────────────────────────────────────────────────────────
 function AgendaSection({ setModal }) {
   const [appts, setAppts] = useState([]); const [loading, setLoading] = useState(true)
+  const [view, setView] = useState("list")
+  const [cursor, setCursor] = useState(() => { const d = new Date(); return new Date(d.getFullYear(), d.getMonth(), 1) })
+  const [selectedDay, setSelectedDay] = useState(null)
   const load = async () => { setLoading(true); const { data } = await supabase.from("appointments").select("*").order("date").order("time"); setAppts(data || []); setLoading(false) }
   useEffect(() => { load() }, [])
   const updateStatus = async (id, status) => { await supabase.from("appointments").update({ status }).eq("id", id); setAppts(v => v.map(a => a.id === id ? { ...a, status } : a)) }
   const deleteAppt = async (id) => { if (!confirm("¿Eliminar esta cita?")) return; await supabase.from("appointments").delete().eq("id", id); setAppts(v => v.filter(a => a.id !== id)) }
   const statusColor = { confirmada: G.success, pendiente: G.gold, cancelada: G.danger }
+
+  const todayStr = today()
+  // Lista: desde hoy en adelante, ascendente
+  const upcoming = appts.filter(a => a.date >= todayStr).sort((x, y) => (x.date + (x.time || "")).localeCompare(y.date + (y.time || "")))
+
+  const ApptRow = (a) => <div key={a.id} style={{ background: G.surface, border: `1px solid ${G.border}`, borderRadius: 8, padding: "16px 18px", display: "flex", alignItems: "center", gap: 16, flexWrap: "wrap" }}>
+    <div style={{ minWidth: 56, textAlign: "center" }}>
+      <div className="serif" style={{ fontSize: 24, color: G.gold }}>{a.date?.split("-")[2]}</div>
+      <div style={{ fontSize: 10, color: G.muted, textTransform: "uppercase" }}>{a.date ? new Date(a.date + "T12:00:00").toLocaleDateString("es-MX", { month: "short" }) : ""}</div>
+    </div>
+    <div style={{ width: 1, height: 40, background: G.border }} />
+    <div style={{ flex: 1, minWidth: 140 }}><div style={{ fontSize: 15, fontWeight: 500 }}>{a.patient_name}</div><div style={{ fontSize: 13, color: G.muted, marginTop: 2 }}>{a.procedure}</div>{a.location && <div style={{ fontSize: 12, color: G.info, marginTop: 2 }}>📍 {a.location}</div>}{a.notes && <div style={{ fontSize: 12, color: G.accent, marginTop: 2 }}>📝 {a.notes}</div>}</div>
+    <div style={{ fontSize: 13, color: G.muted }}>{a.time}</div>
+    <select value={a.status} onChange={e => updateStatus(a.id, e.target.value)} style={{ padding: "5px 10px", border: `1px solid ${statusColor[a.status] || G.border}`, borderRadius: 4, fontSize: 12, color: statusColor[a.status], background: G.surfaceAlt, outline: "none" }}>
+      <option value="pendiente">Pendiente</option><option value="confirmada">Confirmada</option><option value="cancelada">Cancelada</option>
+    </select>
+    <button onClick={() => setModal({ type: "editAppt", appt: a, onSave: load })} style={{ background: "transparent", border: "none", color: G.gold, cursor: "pointer", fontSize: 15 }}>✏️</button>
+    <button onClick={() => deleteAppt(a.id)} style={{ background: "transparent", border: "none", color: G.danger, cursor: "pointer", fontSize: 16 }}>🗑</button>
+  </div>
+
+  // Calendario
+  const year = cursor.getFullYear(), month = cursor.getMonth()
+  const firstDow = new Date(year, month, 1).getDay()
+  const daysInMonth = new Date(year, month + 1, 0).getDate()
+  const monthName = cursor.toLocaleDateString("es-MX", { month: "long", year: "numeric" })
+  const apptsByDay = {}
+  appts.forEach(a => { if (a.date) { const [y, m, d] = a.date.split("-").map(Number); if (y === year && m === month + 1) { (apptsByDay[d] = apptsByDay[d] || []).push(a) } } })
+  const cells = []
+  for (let i = 0; i < firstDow; i++) cells.push(null)
+  for (let d = 1; d <= daysInMonth; d++) cells.push(d)
+  const [ty, tm, td] = todayStr.split("-").map(Number)
+  const isToday = (d) => year === ty && month + 1 === tm && d === td
+  const selDayAppts = selectedDay ? (apptsByDay[selectedDay] || []).sort((x, y) => (x.time || "").localeCompare(y.time || "")) : []
+
   return <div className="fade-in" style={{ flex: 1 }}>
-    <PageHeader title="Agenda" subtitle={`${appts.length} citas`} action={<GoldBtn onClick={() => setModal({ type: "addAppt", onSave: load })}>+ Nueva Cita</GoldBtn>} />
-    <div style={{ padding: "24px 36px" }}>
-      {loading ? <div style={{ display: "flex", justifyContent: "center", padding: 60 }}><Spinner /></div> : appts.length === 0 ? <EmptyState icon="📅" msg="Sin citas registradas" /> :
-        <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-          {appts.map(a => <div key={a.id} style={{ background: G.surface, border: `1px solid ${G.border}`, borderRadius: 8, padding: "18px 22px", display: "flex", alignItems: "center", gap: 20 }}>
-            <div style={{ minWidth: 70, textAlign: "center" }}>
-              <div className="serif" style={{ fontSize: 26, color: G.gold }}>{a.date?.split("-")[2]}</div>
-              <div style={{ fontSize: 11, color: G.muted, textTransform: "uppercase" }}>{a.date ? new Date(a.date + "T12:00:00").toLocaleDateString("es-MX", { month: "short" }) : ""}</div>
+    <PageHeader title="Agenda" subtitle={`${upcoming.length} citas próximas`} action={<GoldBtn onClick={() => setModal({ type: "addAppt", onSave: load })}>+ Nueva Cita</GoldBtn>} />
+    <div style={{ padding: "16px 36px 0", display: "flex", gap: 8 }}>
+      {[["list", "📋 Lista"], ["calendar", "📅 Calendario"]].map(([id, label]) =>
+        <button key={id} onClick={() => setView(id)} style={{ padding: "8px 18px", borderRadius: 6, border: `1px solid ${view === id ? G.gold : G.border}`, background: view === id ? `${G.gold}18` : "transparent", color: view === id ? G.gold : G.muted, fontSize: 13, cursor: "pointer" }}>{label}</button>)}
+    </div>
+    <div style={{ padding: "20px 36px" }}>
+      {loading ? <div style={{ display: "flex", justifyContent: "center", padding: 60 }}><Spinner /></div> :
+        view === "list" ? (
+          upcoming.length === 0 ? <EmptyState icon="📅" msg="Sin citas próximas" /> :
+            <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>{upcoming.map(ApptRow)}</div>
+        ) : (
+          <div>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
+              <button onClick={() => { setCursor(new Date(year, month - 1, 1)); setSelectedDay(null) }} style={{ background: G.surface, border: `1px solid ${G.border}`, borderRadius: 6, padding: "8px 14px", cursor: "pointer", color: G.charcoal }}>‹</button>
+              <div className="serif" style={{ fontSize: 22, textTransform: "capitalize" }}>{monthName}</div>
+              <button onClick={() => { setCursor(new Date(year, month + 1, 1)); setSelectedDay(null) }} style={{ background: G.surface, border: `1px solid ${G.border}`, borderRadius: 6, padding: "8px 14px", cursor: "pointer", color: G.charcoal }}>›</button>
             </div>
-            <div style={{ width: 1, height: 40, background: G.border }} />
-            <div style={{ flex: 1 }}><div style={{ fontSize: 15, fontWeight: 500 }}>{a.patient_name}</div><div style={{ fontSize: 13, color: G.muted, marginTop: 2 }}>{a.procedure}</div>{a.location && <div style={{ fontSize: 12, color: G.info, marginTop: 2 }}>📍 {a.location}</div>}{a.notes && <div style={{ fontSize: 12, color: G.accent, marginTop: 2 }}>📝 {a.notes}</div>}</div>
-            <div style={{ fontSize: 13, color: G.muted }}>{a.time}</div>
-            <select value={a.status} onChange={e => updateStatus(a.id, e.target.value)} style={{ padding: "5px 10px", border: `1px solid ${statusColor[a.status] || G.border}`, borderRadius: 4, fontSize: 12, color: statusColor[a.status], background: G.surfaceAlt, outline: "none" }}>
-              <option value="pendiente">Pendiente</option><option value="confirmada">Confirmada</option><option value="cancelada">Cancelada</option>
-            </select>
-            <button onClick={() => setModal({ type: "editAppt", appt: a, onSave: load })} style={{ background: "transparent", border: "none", color: G.gold, cursor: "pointer", fontSize: 15 }}>✏️</button>
-            <button onClick={() => deleteAppt(a.id)} style={{ background: "transparent", border: "none", color: G.danger, cursor: "pointer", fontSize: 16 }}>🗑</button>
-          </div>)}
-        </div>}
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(7,1fr)", gap: 4 }}>
+              {["Dom", "Lun", "Mar", "Mié", "Jue", "Vie", "Sáb"].map(d => <div key={d} style={{ textAlign: "center", fontSize: 11, color: G.muted, textTransform: "uppercase", padding: "6px 0" }}>{d}</div>)}
+              {cells.map((d, i) => {
+                if (!d) return <div key={"e" + i} />
+                const dayAppts = apptsByDay[d] || []
+                const sel = selectedDay === d
+                return <button key={d} onClick={() => setSelectedDay(sel ? null : d)} style={{ aspectRatio: "1", border: `1px solid ${sel ? G.gold : G.border}`, borderRadius: 8, background: sel ? `${G.gold}18` : isToday(d) ? `${G.info}10` : G.surface, cursor: "pointer", padding: 4, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "flex-start", position: "relative" }}>
+                  <span style={{ fontSize: 13, fontWeight: isToday(d) ? 700 : 400, color: isToday(d) ? G.info : G.charcoal }}>{d}</span>
+                  {dayAppts.length > 0 && <span style={{ marginTop: 2, fontSize: 9, background: G.gold, color: "#fff", borderRadius: 8, padding: "1px 5px" }}>{dayAppts.length}</span>}
+                </button>
+              })}
+            </div>
+            {selectedDay && <div style={{ marginTop: 20 }}>
+              <div className="serif" style={{ fontSize: 18, marginBottom: 12 }}>{selectedDay} de {cursor.toLocaleDateString("es-MX", { month: "long" })}</div>
+              {selDayAppts.length === 0 ? <EmptyState icon="📅" msg="Sin citas este día" /> : <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>{selDayAppts.map(ApptRow)}</div>}
+            </div>}
+          </div>
+        )}
     </div>
   </div>
 }
+
 
 // ─── PATIENTS ─────────────────────────────────────────────────────────────
 function PatientsSection({ setModal, onOpen }) {
