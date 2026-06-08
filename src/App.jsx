@@ -425,9 +425,13 @@ function StatsSection() {
   const [procedures, setProcedures] = useState([]); const [complications, setComplications] = useState([]); const [loading, setLoading] = useState(true)
   useEffect(() => {
     Promise.all([
-      supabase.from("clinical_history").select("*"),
+      supabase.from("appointments").select("*"),
       supabase.from("complications").select("*")
-    ]).then(([p, c]) => { setProcedures(p.data || []); setComplications(c.data || []); setLoading(false) })
+    ]).then(([p, c]) => {
+      // Cuenta las cirugías desde la Agenda, excluyendo las canceladas
+      const cirugias = (p.data || []).filter(a => a.status !== "cancelada")
+      setProcedures(cirugias); setComplications(c.data || []); setLoading(false)
+    })
   }, [])
 
   if (loading) return <div className="fade-in" style={{ flex: 1 }}><PageHeader title="Estadísticas" /><div style={{ display: "flex", justifyContent: "center", padding: 60 }}><Spinner /></div></div>
