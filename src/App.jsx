@@ -30,6 +30,29 @@ const today = () => new Date().toISOString().split("T")[0]
 const fmtDate = (d) => d ? new Date(d + "T12:00:00").toLocaleDateString("es-MX", { day: "2-digit", month: "short", year: "numeric" }) : "—"
 const inputSty = { width: "100%", padding: "10px 14px", border: `1px solid ${G.border}`, borderRadius: 6, fontSize: 13, outline: "none", background: G.bg, color: G.charcoal }
 
+// Normaliza nombres de cirugías para agrupar variantes (mayúsculas, acentos, plurales, "cirugía/de/con", PB, colgajo, etc.)
+const normalizeProc = (raw) => {
+  let s = (raw || "otro").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9\s]/g, " ")
+  const synonyms = { pb: "posbariatrica", posbariatrico: "posbariatrica", posbariatricas: "posbariatrica", posbariatrica: "posbariatrica", colgajo: "posbariatrica", colgajos: "posbariatrica", abdomen: "abdominal", abdominales: "abdominal" }
+  const stop = new Set(["cirugia", "cirugias", "reparadora", "reparador", "de", "del", "con", "la", "el", "los", "las", "y", "e", "a", "para"])
+  let words = s.split(/\s+/).filter(Boolean).map(w => synonyms[w] || w)
+  words = words.map(w => (w.length > 3 && w.endsWith("s")) ? w.slice(0, -1) : w)
+  words = words.map(w => synonyms[w] || w).filter(w => !stop.has(w))
+  words = [...new Set(words)].sort()
+  return words.join(" ") || "otro"
+}
+
+// Normaliza lugares/sedes para agrupar variantes (HILP=hilp, Hospital IOMA = Temperley = Hospital IOMA Temperley)
+const normalizeLoc = (raw) => {
+  const s = (raw || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9\s]/g, " ").replace(/\s+/g, " ").trim()
+  if (!s) return { key: "sin-especificar", label: "Sin especificar" }
+  if (s.includes("hilp")) return { key: "hilp", label: "HILP" }
+  if (s.includes("ioma") || s.includes("temperley")) return { key: "ioma-temperley", label: "Hospital IOMA Temperley" }
+  let words = s.split(" ").map(w => (w.length > 3 && w.endsWith("s")) ? w.slice(0, -1) : w)
+  const key = [...new Set(words)].sort().join(" ")
+  return { key, label: (raw || "").trim() }
+}
+
 function GoldBtn({ children, onClick, small, outline, danger, disabled }) {
   return <button onClick={onClick} disabled={disabled} style={{ padding: small ? "7px 16px" : "10px 22px", background: danger ? G.danger : outline ? "transparent" : `linear-gradient(135deg,${G.gold},${G.goldDark})`, color: outline ? G.gold : "#FFF", border: outline ? `1.5px solid ${G.gold}` : "none", borderRadius: 4, fontSize: small ? 12 : 13, fontWeight: 500, letterSpacing: "0.06em", textTransform: "uppercase", cursor: disabled ? "not-allowed" : "pointer", opacity: disabled ? 0.6 : 1 }}>{children}</button>
 }
@@ -426,11 +449,18 @@ function StatsSection() {
   useEffect(() => {
     Promise.all([
       supabase.from("appointments").select("*"),
+      supabase.from("clinical_history").select("*"),
       supabase.from("complications").select("*")
-    ]).then(([p, c]) => {
-      // Cuenta las cirugías desde la Agenda, excluyendo las canceladas
-      const cirugias = (p.data || []).filter(a => a.status !== "cancelada")
-      setProcedures(cirugias); setComplications(c.data || []); setLoading(false)
+    ]).then(([ap, ch, co]) => {
+      // Combina cirugías de la Agenda (sin canceladas) + Procedimientos, y elimina duplicados
+      const fromAgenda = (ap.data || []).filter(a => a.status !== "cancelada").map(a => ({ date: a.date, procedure: a.procedure, location: a.location, patient_id: a.patient_id }))
+      const fromProcs = (ch.data || []).map(h => ({ date: h.date, procedure: h.procedure, location: h.location, patient_id: h.patient_id }))
+      const seen = new Set(); const deduped = []
+      ;[...fromAgenda, ...fromProcs].forEach(s => {
+        const k = (s.patient_id || "") + "|" + (s.date || "") + "|" + normalizeProc(s.procedure)
+        if (!seen.has(k)) { seen.add(k); deduped.push(s) }
+      })
+      setProcedures(deduped); setComplications(co.data || []); setLoading(false)
     })
   }, [])
 
@@ -446,16 +476,6 @@ function StatsSection() {
   const maxMonth = Math.max(...months.map(m => m.count), 1)
 
   // Procedimientos más frecuentes (con agrupación inteligente de nombres similares)
-  const normalizeProc = (raw) => {
-    let s = (raw || "otro").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9\s]/g, " ")
-    const synonyms = { pb: "posbariatrica", posbariatrico: "posbariatrica", posbariatricas: "posbariatrica", posbariatrica: "posbariatrica", colgajo: "posbariatrica", colgajos: "posbariatrica", abdomen: "abdominal", abdominales: "abdominal" }
-    const stop = new Set(["cirugia", "cirugias", "reparadora", "reparador", "de", "del", "con", "la", "el", "los", "las", "y", "e", "a", "para"])
-    let words = s.split(/\s+/).filter(Boolean).map(w => synonyms[w] || w)
-    words = words.map(w => (w.length > 3 && w.endsWith("s")) ? w.slice(0, -1) : w)
-    words = words.map(w => synonyms[w] || w).filter(w => !stop.has(w))
-    words = [...new Set(words)].sort()
-    return words.join(" ") || "otro"
-  }
   const procGroups = {}
   procedures.forEach(p => {
     const key = normalizeProc(p.procedure)
@@ -475,11 +495,12 @@ function StatsSection() {
   complications.forEach(c => { if (sevCount[c.severity] !== undefined) sevCount[c.severity]++ })
   const compRate = procedures.length > 0 ? ((complications.length / procedures.length) * 100).toFixed(1) : 0
 
-  // Por sede/lugar: cirugías y complicaciones
+  // Por sede/lugar: cirugías y complicaciones (agrupando lugares similares)
   const locStats = {}
-  procedures.forEach(p => { const loc = (p.location || "Sin especificar").trim(); if (!locStats[loc]) locStats[loc] = { surgeries: 0, comps: 0 }; locStats[loc].surgeries++ })
-  complications.forEach(co => { const loc = (co.location || "Sin especificar").trim(); if (!locStats[loc]) locStats[loc] = { surgeries: 0, comps: 0 }; locStats[loc].comps++ })
-  const locRows = Object.entries(locStats).map(([loc, s]) => ({ loc, surgeries: s.surgeries, comps: s.comps, rate: s.surgeries > 0 ? ((s.comps / s.surgeries) * 100).toFixed(1) : "—" })).sort((a, b) => b.surgeries - a.surgeries)
+  const addLoc = (raw, field) => { const { key, label } = normalizeLoc(raw); if (!locStats[key]) locStats[key] = { surgeries: 0, comps: 0, labels: {} }; locStats[key][field]++; locStats[key].labels[label] = (locStats[key].labels[label] || 0) + 1 }
+  procedures.forEach(p => addLoc(p.location, "surgeries"))
+  complications.forEach(co => addLoc(co.location, "comps"))
+  const locRows = Object.values(locStats).map(s => { const loc = Object.entries(s.labels).sort((a, b) => b[1] - a[1])[0][0]; return { loc, surgeries: s.surgeries, comps: s.comps, rate: s.surgeries > 0 ? ((s.comps / s.surgeries) * 100).toFixed(1) : "—" } }).sort((a, b) => b.surgeries - a.surgeries)
 
   const Card = ({ children, title }) => <div style={{ background: G.surface, border: `1px solid ${G.border}`, borderRadius: 10, padding: "24px" }}><div className="serif" style={{ fontSize: 18, marginBottom: 20 }}>{title}</div>{children}</div>
 
