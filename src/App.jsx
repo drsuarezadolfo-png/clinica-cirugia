@@ -306,7 +306,10 @@ function HistorySection({ patient, setModal }) {
         procedures.map(h => <div key={h.id} style={{ background: G.surface, border: `1px solid ${G.border}`, borderRadius: 8, padding: "20px 24px", marginBottom: 14 }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
             <div><div className="serif" style={{ fontSize: 18 }}>{h.procedure}</div><div style={{ fontSize: 12, color: G.muted, marginTop: 4 }}>{fmtDate(h.date)} · {h.surgeon} · Anestesia: {h.anesthesia} · Duración: {h.duration}</div>{h.location && <div style={{ fontSize: 12, color: G.info, marginTop: 4 }}>📍 {h.location}</div>}</div>
-            <button onClick={() => del("clinical_history", h.id, setProcedures)} style={{ background: "transparent", border: "none", color: G.danger, cursor: "pointer", fontSize: 16 }}>🗑</button>
+            <div style={{ display: "flex", gap: 10 }}>
+              <button onClick={() => setModal({ type: "editHistory", history: h, onSave: loadProcedures })} style={{ background: "transparent", border: "none", color: G.gold, cursor: "pointer", fontSize: 15 }}>✏️</button>
+              <button onClick={() => del("clinical_history", h.id, setProcedures)} style={{ background: "transparent", border: "none", color: G.danger, cursor: "pointer", fontSize: 16 }}>🗑</button>
+            </div>
           </div>
           {h.notes && <div style={{ marginTop: 14, padding: "12px 16px", background: G.surfaceAlt, borderRadius: 6, fontSize: 13, lineHeight: 1.7 }}>{h.notes}</div>}
           {h.follow_up && <div style={{ marginTop: 8, fontSize: 12, color: G.info }}>📅 Seguimiento: {fmtDate(h.follow_up)}</div>}
@@ -375,7 +378,7 @@ function PhotosSection({ patient, setModal }) {
     </div>
     {compareMode && <div style={{ background: `${G.gold}12`, border: `1px solid ${G.gold}40`, borderRadius: 6, padding: "12px 16px", marginBottom: 16, fontSize: 13, color: G.goldDark }}>
       Selecciona 2 fotos para compararlas lado a lado ({selected.length}/2)
-      {selected.length === 2 && <button onClick={() => setModal({ type: "compare", photos: selected })} style={{ marginLeft: 16, padding: "6px 14px", background: G.gold, color: "#fff", border: "none", borderRadius: 4, fontSize: 12, cursor: "pointer" }}>Ver comparación →</button>}
+      {selected.length === 2 && <button onClick={() => setModal({ type: "compare", photos: selected, patient })} style={{ marginLeft: 16, padding: "6px 14px", background: G.gold, color: "#fff", border: "none", borderRadius: 4, fontSize: 12, cursor: "pointer" }}>Ver comparación →</button>}
     </div>}
     <div style={{ display: "flex", gap: 8, marginBottom: 20, flexWrap: "wrap" }}>
       {[["all", "Todas"], ["antes", "Antes"], ["despues", "Después"], ["intraop", "Intraop"], ["seguimiento", "Seguimiento"]].map(([v, l]) =>
@@ -392,7 +395,8 @@ function PhotosSection({ patient, setModal }) {
               <div style={{ fontSize: 11, fontWeight: 500 }}>{ph.label || "Foto"}</div>
               <div style={{ fontSize: 11, color: G.muted, marginTop: 2 }}>{fmtDate(ph.date)}</div>
               {!compareMode && <div style={{ display: "flex", gap: 6, marginTop: 8 }}>
-                <button onClick={() => downloadPhoto(ph)} style={{ flex: 1, padding: "5px", background: `${G.gold}18`, border: `1px solid ${G.gold}40`, borderRadius: 4, color: G.gold, fontSize: 11, cursor: "pointer" }}>📥 Descargar</button>
+                <button onClick={() => downloadPhoto(ph)} style={{ flex: 1, padding: "5px", background: `${G.gold}18`, border: `1px solid ${G.gold}40`, borderRadius: 4, color: G.gold, fontSize: 11, cursor: "pointer" }}>📥</button>
+                <button onClick={() => setModal({ type: "editPhoto", photo: ph, onSave: load })} style={{ padding: "5px 8px", background: `${G.gold}18`, border: `1px solid ${G.gold}40`, borderRadius: 4, color: G.gold, fontSize: 11, cursor: "pointer" }}>✏️</button>
                 <button onClick={() => deletePhoto(ph.id)} style={{ padding: "5px 8px", background: `${G.danger}18`, border: `1px solid ${G.danger}40`, borderRadius: 4, color: G.danger, fontSize: 11, cursor: "pointer" }}>🗑</button>
               </div>}
             </div>
@@ -679,12 +683,17 @@ function AddApptForm({ appt, onSave, onClose }) {
   </div>
 }
 
-function AddHistoryForm({ patientId, onSave, onClose }) {
-  const [f, setF] = useState({ date: today(), procedure: "", surgeon: "", anesthesia: "General", duration: "", location: "", notes: "", follow_up: "" })
+function AddHistoryForm({ patientId, history, onSave, onClose }) {
+  const [f, setF] = useState(history ? { date: history.date || today(), procedure: history.procedure || "", surgeon: history.surgeon || "", anesthesia: history.anesthesia || "General", duration: history.duration || "", location: history.location || "", notes: history.notes || "", follow_up: history.follow_up || "" } : { date: today(), procedure: "", surgeon: "", anesthesia: "General", duration: "", location: "", notes: "", follow_up: "" })
   const [saving, setSaving] = useState(false); const set = (k, v) => setF(p => ({ ...p, [k]: v }))
-  const save = async () => { if (!f.procedure.trim()) return; setSaving(true); await supabase.from("clinical_history").insert({ ...f, patient_id: patientId }); onSave(); onClose() }
+  const save = async () => {
+    if (!f.procedure.trim()) return; setSaving(true)
+    if (history) { await supabase.from("clinical_history").update(f).eq("id", history.id) }
+    else { await supabase.from("clinical_history").insert({ ...f, patient_id: patientId }) }
+    onSave(); onClose()
+  }
   return <div>
-    <ModalHeader title="Agregar Procedimiento" onClose={onClose} />
+    <ModalHeader title={history ? "Editar Procedimiento" : "Agregar Procedimiento"} onClose={onClose} />
     <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
       <FormField label="Procedimiento"><input value={f.procedure} onChange={e => set("procedure", e.target.value)} style={inputSty} /></FormField>
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
@@ -817,14 +826,19 @@ function ApplyTemplateForm({ template, patients, onClose }) {
   </div>
 }
 
-function AddPhotoForm({ patientId, onSave, onClose }) {
-  const [f, setF] = useState({ label: "", type: "antes", date: today(), notes: "" })
-  const [preview, setPreview] = useState(""); const [saving, setSaving] = useState(false); const fileRef = useRef()
+function AddPhotoForm({ patientId, photo, onSave, onClose }) {
+  const [f, setF] = useState(photo ? { label: photo.label || "", type: photo.type || "antes", date: photo.date || today(), notes: photo.notes || "" } : { label: "", type: "antes", date: today(), notes: "" })
+  const [preview, setPreview] = useState(photo ? photo.url : ""); const [saving, setSaving] = useState(false); const fileRef = useRef()
   const set = (k, v) => setF(p => ({ ...p, [k]: v }))
   const cameraRef = useRef()
   const handleFile = (e) => { const file = e.target.files[0]; if (!file) return; const reader = new FileReader(); reader.onload = ev => setPreview(ev.target.result); reader.readAsDataURL(file) }
   const save = async () => {
     if (!preview) return; setSaving(true)
+    // Si estamos editando y no se cambió la imagen, solo actualizamos los datos
+    if (photo && preview === photo.url) {
+      await supabase.from("photos").update({ label: f.label, type: f.type, date: f.date, notes: f.notes }).eq("id", photo.id)
+      onSave(); onClose(); return
+    }
     try {
       const fileName = `${patientId}/${Date.now()}-${f.type}.jpg`
       const byteChars = atob(preview.split(",")[1]); const byteNums = new Array(byteChars.length)
@@ -833,11 +847,17 @@ function AddPhotoForm({ patientId, onSave, onClose }) {
       const { error: upErr } = await supabase.storage.from("patient-photos").upload(fileName, blob)
       let url = preview
       if (!upErr) { const { data: urlData } = supabase.storage.from("patient-photos").getPublicUrl(fileName); url = urlData?.publicUrl || preview }
-      await supabase.from("photos").insert({ ...f, patient_id: patientId, storage_path: fileName, url }); onSave(); onClose()
-    } catch (e) { await supabase.from("photos").insert({ ...f, patient_id: patientId, url: preview }); onSave(); onClose() }
+      if (photo) { await supabase.from("photos").update({ ...f, storage_path: fileName, url }).eq("id", photo.id) }
+      else { await supabase.from("photos").insert({ ...f, patient_id: patientId, storage_path: fileName, url }) }
+      onSave(); onClose()
+    } catch (e) {
+      if (photo) { await supabase.from("photos").update({ ...f, url: preview }).eq("id", photo.id) }
+      else { await supabase.from("photos").insert({ ...f, patient_id: patientId, url: preview }) }
+      onSave(); onClose()
+    }
   }
   return <div>
-    <ModalHeader title="Agregar Fotografía" onClose={onClose} />
+    <ModalHeader title={photo ? "Editar Fotografía" : "Agregar Fotografía"} onClose={onClose} />
     <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
       <div style={{ border: `2px dashed ${preview ? G.gold : G.border}`, borderRadius: 8, padding: 24, textAlign: "center", background: G.surfaceAlt }}>
         {preview ? <img src={preview} alt="" style={{ maxHeight: 180, maxWidth: "100%", borderRadius: 6, objectFit: "contain" }} /> : <div style={{ color: G.muted, fontSize: 13 }}>📷<br />Selecciona una opción abajo</div>}
@@ -872,8 +892,12 @@ function PhotoViewer({ photo, onClose }) {
   </div>
 }
 
-function CompareViewer({ photos, onClose }) {
+function CompareViewer({ photos, patient, onClose }) {
   const [a, b] = photos
+  const downloadComparison = () => {
+    const html = `<h1>Comparación Fotográfica</h1><div class="info-grid"><div class="field"><div class="field-label">Paciente</div><div class="field-value">${patient?.name || "—"}</div></div><div class="field"><div class="field-label">Fecha</div><div class="field-value">${new Date().toLocaleDateString("es-MX")}</div></div></div><table style="width:100%;border-collapse:collapse;margin-top:10px"><tr>${[a, b].map(ph => `<td style="width:50%;padding:8px;vertical-align:top;text-align:center"><img src="${ph.url}" style="width:100%;max-width:360px;border-radius:8px;border:1px solid #E5DDD0"/><div style="margin-top:8px;font-weight:bold">${ph.label || "Foto"}</div><div style="color:#8A7F74;font-size:13px">${ph.type} · ${fmtDate(ph.date)}</div></td>`).join("")}</tr></table><div class="footer">Clínica de Cirugía Plástica · ${new Date().toLocaleDateString("es-MX")}</div>`
+    downloadPDF(`comparacion-${patient?.name?.replace(/\s+/g, "-") || "fotos"}.html`, html)
+  }
   return <div>
     <ModalHeader title="Comparación Antes / Después" onClose={onClose} />
     <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
@@ -885,6 +909,7 @@ function CompareViewer({ photos, onClose }) {
         </div>
       </div>)}
     </div>
+    <div style={{ marginTop: 20, textAlign: "center" }}><GoldBtn onClick={downloadComparison}>📥 Descargar Comparación PDF</GoldBtn></div>
   </div>
 }
 
@@ -915,14 +940,14 @@ export default function App() {
     {modal && <ModalOverlay onClose={() => setModal(null)} wide={modal.type === "compare"}>
       {(modal.type === "addPatient" || modal.type === "editPatient") && <PatientForm patient={modal.patient} onSave={modal.onSave} onClose={() => setModal(null)} />}
       {(modal.type === "addAppt" || modal.type === "editAppt") && <AddApptForm appt={modal.appt} onSave={modal.onSave} onClose={() => setModal(null)} />}
-      {modal.type === "addHistory" && <AddHistoryForm patientId={modal.patientId} onSave={modal.onSave} onClose={() => setModal(null)} />}
+      {(modal.type === "addHistory" || modal.type === "editHistory") && <AddHistoryForm patientId={modal.patientId} history={modal.history} onSave={modal.onSave} onClose={() => setModal(null)} />}
       {modal.type === "addEvolution" && <AddEvolutionForm patientId={modal.patientId} onSave={modal.onSave} onClose={() => setModal(null)} />}
       {modal.type === "addComplication" && <AddComplicationForm patient={modal.patient} onSave={modal.onSave} onClose={() => setModal(null)} />}
       {(modal.type === "addTemplate" || modal.type === "editTemplate") && <AddTemplateForm defaultType={modal.defaultType} template={modal.template} onSave={modal.onSave} onClose={() => setModal(null)} />}
       {modal.type === "applyTemplate" && <ApplyTemplateForm template={modal.template} patients={modal.patients} onClose={() => setModal(null)} />}
-      {modal.type === "addPhoto" && <AddPhotoForm patientId={modal.patientId} onSave={modal.onSave} onClose={() => setModal(null)} />}
+      {(modal.type === "addPhoto" || modal.type === "editPhoto") && <AddPhotoForm patientId={modal.patientId || (modal.photo && modal.photo.patient_id)} photo={modal.photo} onSave={modal.onSave} onClose={() => setModal(null)} />}
       {modal.type === "viewPhoto" && <PhotoViewer photo={modal.photo} onClose={() => setModal(null)} />}
-      {modal.type === "compare" && <CompareViewer photos={modal.photos} onClose={() => setModal(null)} />}
+      {modal.type === "compare" && <CompareViewer photos={modal.photos} patient={modal.patient} onClose={() => setModal(null)} />}
     </ModalOverlay>}
   </div>
 }
