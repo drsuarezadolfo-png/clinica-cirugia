@@ -445,10 +445,29 @@ function StatsSection() {
   procedures.forEach(p => { if (p.date) { const k = p.date.slice(0, 7); const m = months.find(x => x.key === k); if (m) m.count++ } })
   const maxMonth = Math.max(...months.map(m => m.count), 1)
 
-  // Procedimientos más frecuentes
-  const procCount = {}
-  procedures.forEach(p => { const name = (p.procedure || "Otro").trim(); procCount[name] = (procCount[name] || 0) + 1 })
-  const topProcs = Object.entries(procCount).sort((a, b) => b[1] - a[1]).slice(0, 8)
+  // Procedimientos más frecuentes (con agrupación inteligente de nombres similares)
+  const normalizeProc = (raw) => {
+    let s = (raw || "otro").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9\s]/g, " ")
+    const synonyms = { pb: "posbariatrica", posbariatrico: "posbariatrica", posbariatricas: "posbariatrica", posbariatrica: "posbariatrica", colgajo: "posbariatrica", colgajos: "posbariatrica", abdomen: "abdominal", abdominales: "abdominal" }
+    const stop = new Set(["cirugia", "cirugias", "reparadora", "reparador", "de", "del", "con", "la", "el", "los", "las", "y", "e", "a", "para"])
+    let words = s.split(/\s+/).filter(Boolean).map(w => synonyms[w] || w)
+    words = words.map(w => (w.length > 3 && w.endsWith("s")) ? w.slice(0, -1) : w)
+    words = words.map(w => synonyms[w] || w).filter(w => !stop.has(w))
+    words = [...new Set(words)].sort()
+    return words.join(" ") || "otro"
+  }
+  const procGroups = {}
+  procedures.forEach(p => {
+    const key = normalizeProc(p.procedure)
+    if (!procGroups[key]) procGroups[key] = { count: 0, labels: {} }
+    procGroups[key].count++
+    const orig = (p.procedure || "Otro").trim()
+    procGroups[key].labels[orig] = (procGroups[key].labels[orig] || 0) + 1
+  })
+  const topProcs = Object.values(procGroups).map(g => {
+    const label = Object.entries(g.labels).sort((a, b) => b[1] - a[1])[0][0]
+    return [label, g.count]
+  }).sort((a, b) => b[1] - a[1]).slice(0, 8)
   const maxProc = Math.max(...topProcs.map(p => p[1]), 1)
 
   // Complicaciones por severidad
@@ -469,7 +488,7 @@ function StatsSection() {
     <div style={{ padding: "24px 36px", display: "flex", flexDirection: "column", gap: 20 }}>
       {/* KPIs */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(180px,1fr))", gap: 16 }}>
-        {[["Cirugías totales", procedures.length, G.gold], ["Complicaciones", complications.length, G.warn], ["Tasa complicaciones", `${compRate}%`, G.danger], ["Tipos de cirugía", Object.keys(procCount).length, G.info]].map(([label, val, color]) =>
+        {[["Cirugías totales", procedures.length, G.gold], ["Complicaciones", complications.length, G.warn], ["Tasa complicaciones", `${compRate}%`, G.danger], ["Tipos de cirugía", Object.keys(procGroups).length, G.info]].map(([label, val, color]) =>
           <div key={label} style={{ background: G.surface, border: `1px solid ${G.border}`, borderRadius: 10, padding: "20px 24px" }}>
             <div className="serif" style={{ fontSize: 36, color }}>{val}</div>
             <div style={{ fontSize: 12, color: G.muted, marginTop: 4 }}>{label}</div>
