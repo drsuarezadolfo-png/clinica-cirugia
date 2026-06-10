@@ -218,12 +218,15 @@ function AgendaSection({ setModal }) {
                 </button>
               })}
             </div>
-            {selectedDay && <div style={{ marginTop: 20 }}>
-              <div className="serif" style={{ fontSize: 18, marginBottom: 12 }}>{selectedDay} de {cursor.toLocaleDateString("es-MX", { month: "long" })}</div>
-              {selDayAppts.length === 0 ? <EmptyState icon="📅" msg="Sin citas este día" /> : <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>{selDayAppts.map(ApptRow)}</div>}
-            </div>}
           </div>
         )}
+      {selectedDay && view === "calendar" && <ModalOverlay onClose={() => setSelectedDay(null)} wide>
+        <ModalHeader title={`${selectedDay} de ${cursor.toLocaleDateString("es-MX", { month: "long", year: "numeric" })}`} onClose={() => setSelectedDay(null)} />
+        <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 16 }}>
+          <GoldBtn small onClick={() => { const dd = String(selectedDay).padStart(2, "0"); const mm = String(month + 1).padStart(2, "0"); setSelectedDay(null); setModal({ type: "addAppt", presetDate: `${year}-${mm}-${dd}`, onSave: load }) }}>+ Nueva cita este día</GoldBtn>
+        </div>
+        {selDayAppts.length === 0 ? <EmptyState icon="📅" msg="Sin citas este día" /> : <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>{selDayAppts.map(ApptRow)}</div>}
+      </ModalOverlay>}
     </div>
   </div>
 }
@@ -706,8 +709,8 @@ function PatientForm({ patient, onSave, onClose }) {
   </div>
 }
 
-function AddApptForm({ appt, onSave, onClose }) {
-  const [patients, setPatients] = useState([]); const [f, setF] = useState(appt ? { patient_id: appt.patient_id || "", date: appt.date || today(), time: appt.time || "10:00", procedure: appt.procedure || "", location: appt.location || "", status: appt.status || "pendiente", notes: appt.notes || "" } : { patient_id: "", date: today(), time: "10:00", procedure: "", location: "", status: "pendiente", notes: "" })
+function AddApptForm({ appt, presetDate, onSave, onClose }) {
+  const [patients, setPatients] = useState([]); const [f, setF] = useState(appt ? { patient_id: appt.patient_id || "", date: appt.date || today(), time: appt.time || "10:00", procedure: appt.procedure || "", location: appt.location || "", status: appt.status || "pendiente", notes: appt.notes || "" } : { patient_id: "", date: presetDate || today(), time: "10:00", procedure: "", location: "", status: "pendiente", notes: "" })
   const [saving, setSaving] = useState(false); const set = (k, v) => setF(p => ({ ...p, [k]: v }))
   useEffect(() => { supabase.from("patients").select("id,name").order("name").then(({ data }) => setPatients(data || [])) }, [])
   const save = async () => {
@@ -990,7 +993,7 @@ export default function App() {
     </main>
     {modal && <ModalOverlay onClose={() => setModal(null)} wide={modal.type === "compare"}>
       {(modal.type === "addPatient" || modal.type === "editPatient") && <PatientForm patient={modal.patient} onSave={modal.onSave} onClose={() => setModal(null)} />}
-      {(modal.type === "addAppt" || modal.type === "editAppt") && <AddApptForm appt={modal.appt} onSave={modal.onSave} onClose={() => setModal(null)} />}
+      {(modal.type === "addAppt" || modal.type === "editAppt") && <AddApptForm appt={modal.appt} presetDate={modal.presetDate} onSave={modal.onSave} onClose={() => setModal(null)} />}
       {(modal.type === "addHistory" || modal.type === "editHistory") && <AddHistoryForm patientId={modal.patientId} history={modal.history} onSave={modal.onSave} onClose={() => setModal(null)} />}
       {modal.type === "addEvolution" && <AddEvolutionForm patientId={modal.patientId} onSave={modal.onSave} onClose={() => setModal(null)} />}
       {modal.type === "addComplication" && <AddComplicationForm patient={modal.patient} onSave={modal.onSave} onClose={() => setModal(null)} />}
