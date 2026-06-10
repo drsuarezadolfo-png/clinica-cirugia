@@ -203,11 +203,18 @@ function AgendaSection({ setModal }) {
               {["Dom", "Lun", "Mar", "Mié", "Jue", "Vie", "Sáb"].map(d => <div key={d} style={{ textAlign: "center", fontSize: 11, color: G.muted, textTransform: "uppercase", padding: "6px 0" }}>{d}</div>)}
               {cells.map((d, i) => {
                 if (!d) return <div key={"e" + i} />
-                const dayAppts = apptsByDay[d] || []
+                const dayAppts = (apptsByDay[d] || []).slice().sort((x, y) => (x.time || "").localeCompare(y.time || ""))
                 const sel = selectedDay === d
-                return <button key={d} onClick={() => setSelectedDay(sel ? null : d)} style={{ aspectRatio: "1", border: `1px solid ${sel ? G.gold : G.border}`, borderRadius: 8, background: sel ? `${G.gold}18` : isToday(d) ? `${G.info}10` : G.surface, cursor: "pointer", padding: 4, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "flex-start", position: "relative" }}>
-                  <span style={{ fontSize: 13, fontWeight: isToday(d) ? 700 : 400, color: isToday(d) ? G.info : G.charcoal }}>{d}</span>
-                  {dayAppts.length > 0 && <span style={{ marginTop: 2, fontSize: 9, background: G.gold, color: "#fff", borderRadius: 8, padding: "1px 5px" }}>{dayAppts.length}</span>}
+                return <button key={d} onClick={() => setSelectedDay(sel ? null : d)} style={{ minHeight: 78, border: `1px solid ${sel ? G.gold : G.border}`, borderRadius: 8, background: sel ? `${G.gold}18` : isToday(d) ? `${G.info}10` : G.surface, cursor: "pointer", padding: "4px 3px", display: "flex", flexDirection: "column", alignItems: "stretch", justifyContent: "flex-start", overflow: "hidden", textAlign: "left" }}>
+                  <span style={{ fontSize: 12, fontWeight: isToday(d) ? 700 : 400, color: isToday(d) ? G.info : G.charcoal, textAlign: "center", marginBottom: 2 }}>{d}</span>
+                  {dayAppts.slice(0, 3).map(a => {
+                    const col = a.status === "cancelada" ? G.danger : a.status === "confirmada" ? G.success : G.gold
+                    return <div key={a.id} style={{ fontSize: 8, lineHeight: 1.15, background: `${col}18`, borderLeft: `2px solid ${col}`, borderRadius: 2, padding: "1px 2px", marginBottom: 2, overflow: "hidden", whiteSpace: "nowrap", textOverflow: "ellipsis" }}>
+                      <div style={{ fontWeight: 600, color: G.charcoal, overflow: "hidden", textOverflow: "ellipsis" }}>{a.patient_name}</div>
+                      <div style={{ color: G.muted, overflow: "hidden", textOverflow: "ellipsis" }}>{a.procedure}</div>
+                    </div>
+                  })}
+                  {dayAppts.length > 3 && <div style={{ fontSize: 8, color: G.gold, fontWeight: 600, textAlign: "center" }}>+{dayAppts.length - 3} más</div>}
                 </button>
               })}
             </div>
